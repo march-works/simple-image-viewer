@@ -86,6 +86,7 @@ const App = () => {
   return (
     <div
       className="App h-screen w-screen flex bg-neutral-900"
+      tabIndex={0}
       onKeyDown={(e) =>
         e.key === 'ArrowLeft'
           ? moveBackward()
