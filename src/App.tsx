@@ -1,29 +1,31 @@
-import { useCallback, useEffect, useState } from "react";
-import "./App.css";
-import { PathSelection } from "./features/directory-tree/routes/PathSelection";
+import { useCallback, useEffect, useState } from 'react';
+import './App.css';
+import { PathSelection } from './features/directory-tree/routes/PathSelection';
 import {
   Directory,
   DirectoryTree,
   File,
-} from "./features/directory-tree/types/DirectoryTree";
-import { ImageCanvas } from "./features/image/routes/ImageCanvas";
+} from './features/directory-tree/types/DirectoryTree';
+import { ImageCanvas } from './features/image/routes/ImageCanvas';
+import { useDebounce } from './hooks/useDebounce';
 
 const App = () => {
   const [tree, setTree] = useState<DirectoryTree[]>([]);
   const [currentDir, setCurrentDir] = useState<File[]>([]);
   const [viewing, setViewing] = useState<number>(0);
-  const [selected, setSelected] = useState<string>("");
+  const [selected, setSelected] = useState<string>('');
+  const debouncedSelected = useDebounce(selected, 200);
 
   const extractFirstFiles = useCallback((entries: DirectoryTree[]): File[] => {
     const files = entries
-      .filter((entry) => entry.type === "File")
+      .filter((entry) => entry.type === 'File')
       .map((entry) => entry as File);
     if (files.length) {
       return files;
     }
 
     const dirs = entries
-      .filter((entry) => entry.type === "Directory")
+      .filter((entry) => entry.type === 'Directory')
       .map((entry) => entry as Directory);
     for (const dir of dirs) {
       const files = extractFirstFiles(dir.children);
@@ -39,7 +41,7 @@ const App = () => {
   }, [tree, extractFirstFiles]);
 
   useEffect(() => {
-    setSelected(currentDir[viewing]?.path ?? "");
+    setSelected(currentDir[viewing]?.path ?? '');
   }, [currentDir, viewing]);
 
   const findViewingFiles = (
@@ -56,15 +58,15 @@ const App = () => {
       return {
         page: found,
         files: dirs
-          .filter((dir) => dir.type === "File")
+          .filter((dir) => dir.type === 'File')
           .map((dir) => dir as File),
       };
     }
-    dirs.forEach((dir) => {
+    for (const dir of dirs) {
       const files =
-        dir.type === "Directory" && findViewingFiles(path, dir.children);
-      if (files !== undefined) return files;
-    });
+        dir.type === 'Directory' && findViewingFiles(path, dir.children);
+      if (files) return files;
+    }
     return undefined;
   };
 
@@ -74,7 +76,7 @@ const App = () => {
     files && setViewing(files.page);
   };
 
-  const moveFoward = () => {
+  const moveForward = () => {
     setViewing((prev) => (prev + 1) % currentDir.length);
   };
   const moveBackward = () => {
@@ -82,13 +84,14 @@ const App = () => {
   };
 
   return (
-    <div className="App h-screen w-screen flex bg-neutral-900">
+    <div className="App h-screen w-screen flex bg-neutral-900" onKeyDown={(e) => e.key === 'ArrowLeft' ? moveBackward() : e.key === 'ArrowRight' ? moveForward() : undefined}>
       <ImageCanvas
-        path={selected}
-        moveForward={moveFoward}
+        path={debouncedSelected}
+        moveForward={moveForward}
         moveBackward={moveBackward}
       />
       <PathSelection
+        selected={selected}
         tree={tree}
         setTree={setTree}
         onSelectedChanged={handleOnSelectedChanged}
