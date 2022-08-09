@@ -25,19 +25,17 @@ export const ImageCanvas: FC<Props> = ({ path, moveForward, moveBackward }) => {
 
   return (
     <div className="flex content-center" style={{ flex: 4 }}>
-      <div className='flex items-center cursor-pointer' onClick={moveBackward}>
-        <LeftOutlined className='p-2 text-xl' />
+      <div className="flex items-center cursor-pointer" onClick={moveBackward}>
+        <LeftOutlined className="p-2 text-xl" />
       </div>
-      <div className='flex content-center flex-1'>
-        <Image
-          rootClassName='flex content-center flex-1'
+      <div className="flex content-center flex-1">
+        <img
           className="object-contain flex-1"
           src={`data:image/jpeg;base64,${data}`}
-          preview={false}
         />
       </div>
-      <div className='flex items-center cursor-pointer' onClick={moveForward}>
-        <RightOutlined className='p-2 text-xl' />
+      <div className="flex items-center cursor-pointer" onClick={moveForward}>
+        <RightOutlined className="p-2 text-xl" />
       </div>
     </div>
   );
