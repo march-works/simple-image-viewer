@@ -1,31 +1,33 @@
-import { open } from "@tauri-apps/api/dialog";
-import { FileEntry, readDir } from "@tauri-apps/api/fs";
-import { FC } from "react";
-import { FileTree } from "../components/FileTree";
-import { DirectoryTree } from "../types/DirectoryTree";
+import { open } from '@tauri-apps/api/dialog';
+import { FileEntry, readDir } from '@tauri-apps/api/fs';
+import { FC } from 'react';
+import { FileTree } from '../components/FileTree';
+import { DirectoryTree } from '../types/DirectoryTree';
 
 type Props = {
   tree: DirectoryTree[];
+  selected: string;
   setTree: (tree: DirectoryTree[]) => void;
   onSelectedChanged: (entries: string) => void;
 };
 
 export const PathSelection: FC<Props> = ({
   tree,
+  selected,
   setTree,
   onSelectedChanged,
 }) => {
   const convertEntryToTree = (entry: FileEntry): DirectoryTree => {
     if (entry.children === null || entry.children === undefined) {
       return {
-        type: "File",
-        name: entry.name ?? "",
+        type: 'File',
+        name: entry.name ?? '',
         path: entry.path,
       };
     }
     return {
-      type: "Directory",
-      name: entry.name ?? "",
+      type: 'Directory',
+      name: entry.name ?? '',
       path: entry.path,
       children: entry.children.map(convertEntryToTree),
     };
@@ -54,6 +56,7 @@ export const PathSelection: FC<Props> = ({
       </button>
       <div className="overflow-y-auto">
         <FileTree
+          selected={selected}
           entries={tree}
           onClick={(entry) => onSelectedChanged(entry.path)}
         />
