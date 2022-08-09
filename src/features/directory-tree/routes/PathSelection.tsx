@@ -56,7 +56,10 @@ export const PathSelection: FC<Props> = ({
       title: tree.name,
       key: tree.path + (tree.type === 'Directory' ? 'dir' : ''),
       isLeaf: tree.type === 'File',
-      children: tree.type === 'Directory' ? tree.children.map(convertTreeToNode) : undefined,
+      children:
+        tree.type === 'Directory'
+          ? tree.children.map(convertTreeToNode)
+          : undefined,
     };
   };
 
@@ -64,8 +67,11 @@ export const PathSelection: FC<Props> = ({
 
   return (
     <div className="flex flex-col flex-1 space-y-2">
-      <div className='flex flex-col'>
-        <FolderOpenOutlined className='text-xl block self-end p-3' onClick={handleOnClick} />
+      <div className="flex flex-col">
+        <FolderOpenOutlined
+          className="text-xl block self-end p-3"
+          onClick={handleOnClick}
+        />
       </div>
       <div className="overflow-y-auto">
         <DirectoryList
