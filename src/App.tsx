@@ -84,7 +84,16 @@ const App = () => {
   };
 
   return (
-    <div className="App h-screen w-screen flex bg-neutral-900" onKeyDown={(e) => e.key === 'ArrowLeft' ? moveBackward() : e.key === 'ArrowRight' ? moveForward() : undefined}>
+    <div
+      className="App h-screen w-screen flex bg-neutral-900"
+      onKeyDown={(e) =>
+        e.key === 'ArrowLeft'
+          ? moveBackward()
+          : e.key === 'ArrowRight'
+          ? moveForward()
+          : undefined
+      }
+    >
       <ImageCanvas
         path={debouncedSelected}
         moveForward={moveForward}

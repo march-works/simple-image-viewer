@@ -10,7 +10,7 @@ type Props = {
 
 export const ImageCanvas: FC<Props> = ({ path, moveForward, moveBackward }) => {
   const [data, setData] = useState<string>('');
-  
+
   const convertPathToData = useCallback(async (path: string) => {
     if (path === '') return '';
     const ret = await readBinaryFile(path);

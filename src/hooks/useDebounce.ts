@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect } from 'react';
 
 // valueによるstateの更新をdelay(ms)だけ抑制する
 export const useDebounce = <T>(value: T, delay: number) => {
@@ -12,8 +12,7 @@ export const useDebounce = <T>(value: T, delay: number) => {
     return () => {
       clearTimeout(timer);
     };
-    
   }, [value, delay]);
 
   return debouncedValue;
-}
+};
