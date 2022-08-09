@@ -1,4 +1,6 @@
+import { LeftOutlined, RightOutlined } from '@ant-design/icons';
 import { readBinaryFile } from '@tauri-apps/api/fs';
+import { Image } from 'antd';
 import { fromByteArray } from 'base64-js';
 import { FC, useCallback, useEffect, useState } from 'react';
 
@@ -23,19 +25,20 @@ export const ImageCanvas: FC<Props> = ({ path, moveForward, moveBackward }) => {
 
   return (
     <div className="flex content-center" style={{ flex: 4 }}>
-      <button className="text-neutral-100" onClick={moveBackward}>
-        {'<'}
-      </button>
-      <div className="flex content-center flex-1">
-        <img
-          src={`data:image/jpeg;base64,${data}`}
-          alt={'please specify directory'}
+      <div className='flex items-center cursor-pointer' onClick={moveBackward}>
+        <LeftOutlined className='p-2 text-xl' />
+      </div>
+      <div className='flex content-center flex-1'>
+        <Image
+          rootClassName='flex content-center flex-1'
           className="object-contain flex-1"
+          src={`data:image/jpeg;base64,${data}`}
+          preview={false}
         />
       </div>
-      <button className="text-neutral-100" onClick={moveForward}>
-        {'>'}
-      </button>
+      <div className='flex items-center cursor-pointer' onClick={moveForward}>
+        <RightOutlined className='p-2 text-xl' />
+      </div>
     </div>
   );
 };

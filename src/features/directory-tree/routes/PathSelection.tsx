@@ -1,7 +1,9 @@
+import { FolderOpenOutlined } from '@ant-design/icons';
 import { open } from '@tauri-apps/api/dialog';
 import { FileEntry, readDir } from '@tauri-apps/api/fs';
+import { DataNode } from 'antd/lib/tree';
+import DirectoryList from 'antd/lib/tree/DirectoryTree';
 import { FC } from 'react';
-import { FileTree } from '../components/FileTree';
 import { DirectoryTree } from '../types/DirectoryTree';
 
 type Props = {
@@ -49,16 +51,36 @@ export const PathSelection: FC<Props> = ({
     setTree(entries.map(convertEntryToTree));
   };
 
+  const convertTreeToNode = (tree: DirectoryTree): DataNode => {
+    return {
+      title: tree.name,
+      key: tree.path + (tree.type === 'Directory' ? 'dir' : ''),
+      isLeaf: tree.type === 'File',
+      children: tree.type === 'Directory' ? tree.children.map(convertTreeToNode) : undefined,
+    };
+  };
+
+  const directoryData: DataNode[] = tree.map(convertTreeToNode);
+
   return (
-    <div className="flex flex-col space-y-2">
-      <button onClick={handleOnClick} className="bg-neutral-200 rounded">
-        Open Directory
-      </button>
+    <div className="flex flex-col flex-1 space-y-2">
+      <div className='flex flex-col'>
+        <FolderOpenOutlined className='text-xl block self-end p-3' onClick={handleOnClick} />
+      </div>
       <div className="overflow-y-auto">
-        <FileTree
-          selected={selected}
-          entries={tree}
-          onClick={(entry) => onSelectedChanged(entry.path)}
+        <DirectoryList
+          className="bg-neutral-200"
+          defaultExpandAll
+          onSelect={(key) => {
+            const path = key[0] as string;
+            path.endsWith('dir') || onSelectedChanged(key[0] as string);
+          }}
+          onExpand={() => {
+            // do nothing
+          }}
+          treeData={directoryData}
+          selectedKeys={[selected]}
+          onKeyDown={() => true}
         />
       </div>
     </div>
