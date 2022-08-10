@@ -1,111 +1,78 @@
-import { useCallback, useEffect, useState } from 'react';
-import './App.css';
-import { PathSelection } from './features/directory-tree/routes/PathSelection';
-import {
-  Directory,
-  DirectoryTree,
-  File,
-} from './features/directory-tree/types/DirectoryTree';
-import { ImageCanvas } from './features/image/routes/ImageCanvas';
-import { useDebounce } from './hooks/useDebounce';
+import { useRef, useState } from 'react';
+import { open } from '@tauri-apps/api/dialog';
+import { Tabs } from './components/Tab/Tabs';
+import { ViewerTab } from './pages/viewer/ViewerTab';
 
 const App = () => {
-  const [tree, setTree] = useState<DirectoryTree[]>([]);
-  const [currentDir, setCurrentDir] = useState<File[]>([]);
-  const [viewing, setViewing] = useState<number>(0);
-  const [selected, setSelected] = useState<string>('');
-  const debouncedSelected = useDebounce(selected, 200);
+  const [activeKey, setActiveKey] = useState<string>();
+  const [panes, setPanes] = useState<
+    {
+      title: string;
+      key: string;
+      path: string;
+    }[]
+  >([]);
+  const newTabIndex = useRef(0);
 
-  const extractFirstFiles = useCallback((entries: DirectoryTree[]): File[] => {
-    const files = entries
-      .filter((entry) => entry.type === 'File')
-      .map((entry) => entry as File);
-    if (files.length) {
-      return files;
+  const onChange = (newActiveKey: string) => {
+    setActiveKey(newActiveKey);
+  };
+
+  const add = async () => {
+    const dir = await open({
+      directory: true,
+    });
+    if (Array.isArray(dir)) {
+      return;
+    }
+    if (!dir) {
+      return;
     }
 
-    const dirs = entries
-      .filter((entry) => entry.type === 'Directory')
-      .map((entry) => entry as Directory);
-    for (const dir of dirs) {
-      const files = extractFirstFiles(dir.children);
-      if (files.length) return files;
-    }
-    return [];
-  }, []);
+    const newActiveKey = `newTab${newTabIndex.current++}`;
+    const newPanes = [...panes];
+    newPanes.push({
+      title: dir.split('\\').pop()?.split('/').pop() ?? '',
+      key: newActiveKey,
+      path: dir,
+    });
+    setPanes(newPanes);
+    setActiveKey(newActiveKey);
+  };
 
-  useEffect(() => {
-    const entry = extractFirstFiles(tree);
-    entry && setCurrentDir(entry);
-    entry && setViewing(0);
-  }, [tree, extractFirstFiles]);
-
-  useEffect(() => {
-    setSelected(currentDir[viewing]?.path ?? '');
-  }, [currentDir, viewing]);
-
-  const findViewingFiles = (
-    path: string,
-    dirs: DirectoryTree[]
-  ):
-    | {
-        page: number;
-        files: File[];
+  const remove = (targetKey: string) => {
+    let newActiveKey = activeKey;
+    let lastIndex = -1;
+    panes.forEach((pane, i) => {
+      if (pane.key === targetKey) {
+        lastIndex = i - 1;
       }
-    | undefined => {
-    const found = dirs.findIndex((dir) => dir.path === path);
-    if (found !== -1) {
-      return {
-        page: found,
-        files: dirs
-          .filter((dir) => dir.type === 'File')
-          .map((dir) => dir as File),
-      };
+    });
+    const newPanes = panes.filter((pane) => pane.key !== targetKey);
+    if (newPanes.length && newActiveKey === targetKey) {
+      if (lastIndex >= 0) {
+        newActiveKey = newPanes[lastIndex].key;
+      } else {
+        newActiveKey = newPanes[0].key;
+      }
     }
-    for (const dir of dirs) {
-      const files =
-        dir.type === 'Directory' && findViewingFiles(path, dir.children);
-      if (files) return files;
-    }
-    return undefined;
-  };
-
-  const handleOnSelectedChanged = (path: string) => {
-    const files = findViewingFiles(path, tree);
-    files && setCurrentDir(files.files);
-    files && setViewing(files.page);
-  };
-
-  const moveForward = () => {
-    setViewing((prev) => (prev + 1) % currentDir.length);
-  };
-  const moveBackward = () => {
-    setViewing((prev) => (prev - 1 + currentDir.length) % currentDir.length);
+    setPanes(newPanes);
+    setActiveKey(newActiveKey);
   };
 
   return (
-    <div
-      className="App h-screen w-screen flex bg-neutral-900"
-      tabIndex={0}
-      onKeyDown={(e) =>
-        e.key === 'ArrowLeft'
-          ? moveBackward()
-          : e.key === 'ArrowRight'
-          ? moveForward()
-          : undefined
-      }
-    >
-      <ImageCanvas
-        path={debouncedSelected}
-        moveForward={moveForward}
-        moveBackward={moveBackward}
-      />
-      <PathSelection
-        selected={selected}
-        tree={tree}
-        setTree={setTree}
-        onSelectedChanged={handleOnSelectedChanged}
-      />
+    <div className="App h-screen w-screen flex bg-neutral-900">
+      <Tabs
+        viewing={activeKey}
+        tabs={panes}
+        handleOnClick={onChange}
+        handleOnClose={remove}
+        handleOnAdd={add}
+      >
+        {panes.map((pane) => (
+          <ViewerTab key={pane.key} path={pane.path} />
+        ))}
+      </Tabs>
     </div>
   );
 };
