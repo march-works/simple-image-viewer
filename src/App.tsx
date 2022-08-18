@@ -19,8 +19,14 @@ const App = () => {
   };
 
   const add = async () => {
+    const exts = ['png', 'PNG', 'jpg', 'jpeg', 'JPG'];
     const dir = await open({
-      directory: true,
+      filters: [
+        {
+          name: 'Image',
+          extensions: [...exts, 'zip'],
+        },
+      ],
     });
     if (Array.isArray(dir)) {
       return;
@@ -31,10 +37,17 @@ const App = () => {
 
     const newActiveKey = `newTab${newTabIndex.current++}`;
     const newPanes = [...panes];
+    const title = exts.some((ext) => dir.endsWith(ext))
+      ? dir.replaceAll(/\\/gi, '/').split('/').slice(undefined, -1).pop() ?? ''
+      : dir.split('\\').pop()?.split('/').pop()?.split('.')[0] ?? '';
+    const bsIdx = dir.lastIndexOf('\\');
+    const splited = dir.slice(0, bsIdx >= 0 ? bsIdx : undefined);
+    const slIndx = splited.lastIndexOf('/');
+    const path = splited.slice(0, slIndx >= 0 ? slIndx : undefined);
     newPanes.push({
-      title: dir.split('\\').pop()?.split('/').pop() ?? '',
+      title: title,
       key: newActiveKey,
-      path: dir,
+      path: path,
     });
     setPanes(newPanes);
     setActiveKey(newActiveKey);
