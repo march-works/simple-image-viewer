@@ -2,6 +2,17 @@ import { useRef, useState } from 'react';
 import { open } from '@tauri-apps/api/dialog';
 import { Tabs } from './components/Tab/Tabs';
 import { ViewerTab } from './pages/viewer/ViewerTab';
+import { ImageExtensions } from './features/filepath/consts/images';
+import { CompressedExtensions } from './features/filepath/consts/compressed';
+import {
+  isCompressedFile,
+  isImageFile,
+} from './features/filepath/utils/checkers';
+import {
+  getFileNameWithoutExtension,
+  getParentDirectoryName,
+  getParentDirectoryPath,
+} from './features/filepath/utils/converters';
 
 const App = () => {
   const [activeKey, setActiveKey] = useState<string>();
@@ -19,12 +30,11 @@ const App = () => {
   };
 
   const add = async () => {
-    const exts = ['png', 'PNG', 'jpg', 'jpeg', 'JPG'];
     const dir = await open({
       filters: [
         {
           name: 'Image',
-          extensions: [...exts, 'zip'],
+          extensions: [...ImageExtensions, ...CompressedExtensions],
         },
       ],
     });
@@ -37,13 +47,10 @@ const App = () => {
 
     const newActiveKey = `newTab${newTabIndex.current++}`;
     const newPanes = [...panes];
-    const title = exts.some((ext) => dir.endsWith(ext))
-      ? dir.replaceAll(/\\/gi, '/').split('/').slice(undefined, -1).pop() ?? ''
-      : dir.split('\\').pop()?.split('/').pop()?.split('.')[0] ?? '';
-    const bsIdx = dir.lastIndexOf('\\');
-    const splited = dir.slice(0, bsIdx >= 0 ? bsIdx : undefined);
-    const slIndx = splited.lastIndexOf('/');
-    const path = splited.slice(0, slIndx >= 0 ? slIndx : undefined);
+    const title = isImageFile(dir)
+      ? getParentDirectoryName(dir)
+      : getFileNameWithoutExtension(dir);
+    const path = isCompressedFile(dir) ? dir : getParentDirectoryPath(dir);
     newPanes.push({
       title: title,
       key: newActiveKey,
@@ -74,7 +81,7 @@ const App = () => {
   };
 
   return (
-    <div className="App h-screen w-screen flex bg-neutral-900">
+    <div className="App h-full w-full flex bg-neutral-900">
       <Tabs
         viewing={activeKey}
         tabs={panes}

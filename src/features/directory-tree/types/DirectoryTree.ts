@@ -11,4 +11,10 @@ export type File = {
   path: string;
 };
 
-export type DirectoryTree = Directory | File;
+export type Zip = {
+  type: 'Zip';
+  name: string;
+  path: string;
+};
+
+export type DirectoryTree = Directory | File | Zip;

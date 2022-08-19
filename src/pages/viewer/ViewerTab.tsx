@@ -1,3 +1,4 @@
+import { invoke } from '@tauri-apps/api';
 import { FileEntry, readDir } from '@tauri-apps/api/fs';
 import { FC, useCallback, useEffect, useState } from 'react';
 import { PathSelection } from '../../features/directory-tree/routes/PathSelection';
@@ -5,7 +6,9 @@ import {
   Directory,
   DirectoryTree,
   File,
+  Zip,
 } from '../../features/directory-tree/types/DirectoryTree';
+import { isCompressedFile } from '../../features/filepath/utils/checkers';
 import { ImageCanvas } from '../../features/image/routes/ImageCanvas';
 import { useDebounce } from '../../hooks/useDebounce';
 
@@ -15,9 +18,9 @@ type Props = {
 
 export const ViewerTab: FC<Props> = ({ path }) => {
   const [tree, setTree] = useState<DirectoryTree[]>([]);
-  const [currentDir, setCurrentDir] = useState<File[]>([]);
+  const [currentDir, setCurrentDir] = useState<(File | Zip)[]>([]);
   const [viewing, setViewing] = useState<number>(0);
-  const [selected, setSelected] = useState<string>('');
+  const [selected, setSelected] = useState<File | Zip>();
   const debouncedSelected = useDebounce(selected, 200);
 
   const convertEntryToTree = (entry: FileEntry): DirectoryTree => {
@@ -37,10 +40,25 @@ export const ViewerTab: FC<Props> = ({ path }) => {
   };
 
   const readDirAndSetTree = async () => {
-    const entries = await readDir(path, {
-      recursive: true,
-    });
-    setTree(entries.map(convertEntryToTree));
+    if (isCompressedFile(path)) {
+      const files = await invoke<string[]>('get_filenames_inner_zip', {
+        filepath: path,
+      });
+      setTree(
+        files.map((file) => {
+          return {
+            type: 'Zip',
+            name: file,
+            path,
+          };
+        })
+      );
+    } else {
+      const entries = await readDir(path, {
+        recursive: true,
+      });
+      setTree(entries.map(convertEntryToTree));
+    }
   };
 
   useEffect(() => {
@@ -72,7 +90,7 @@ export const ViewerTab: FC<Props> = ({ path }) => {
   }, [tree, extractFirstFiles]);
 
   useEffect(() => {
-    setSelected(currentDir[viewing]?.path ?? '');
+    setSelected(currentDir[viewing]);
   }, [currentDir, viewing]);
 
   const findViewingFiles = (
@@ -81,16 +99,23 @@ export const ViewerTab: FC<Props> = ({ path }) => {
   ):
     | {
         page: number;
-        files: File[];
+        files: (File | Zip)[];
       }
     | undefined => {
-    const found = dirs.findIndex((dir) => dir.path === path);
+    const validFiles = dirs.filter(
+      (dir) => dir.type === 'File' || dir.type === 'Zip'
+    );
+    const found = validFiles.findIndex((dir) =>
+      dir.type === 'File'
+        ? dir.path === path
+        : dir.type === 'Zip'
+        ? dir.path + dir.name === path
+        : false
+    );
     if (found !== -1) {
       return {
         page: found,
-        files: dirs
-          .filter((dir) => dir.type === 'File')
-          .map((dir) => dir as File),
+        files: validFiles.map((dir) => dir as File | Zip),
       };
     }
     for (const dir of dirs) {
@@ -127,7 +152,7 @@ export const ViewerTab: FC<Props> = ({ path }) => {
       }
     >
       <ImageCanvas
-        path={debouncedSelected}
+        viewing={debouncedSelected}
         moveForward={moveForward}
         moveBackward={moveBackward}
       />
