@@ -54,7 +54,16 @@ export const Tabs: FC<Props> = ({
       </div>
       <div className="relative" style={{ height: 'calc(100% - 2rem)' }}>
         {Array.isArray(children)
-          ? children.find((child) => child.key === viewing)
+          ? children.map((child) => (
+              <div
+                key={child.key}
+                className={`w-full h-full${
+                  child.key === viewing ? '' : ' hidden'
+                }`}
+              >
+                {child}
+              </div>
+            ))
           : children}
       </div>
     </div>
