@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api';
 import { FileEntry, readDir } from '@tauri-apps/api/fs';
-import { FC, useCallback, useEffect, useState } from 'react';
+import { FC, useCallback, useEffect, useRef, useState } from 'react';
 import { PathSelection } from '../../features/directory-tree/routes/PathSelection';
 import {
   Directory,
@@ -13,12 +13,17 @@ import { ImageCanvas } from '../../features/image/routes/ImageCanvas';
 import { useDebounce } from '../../hooks/useDebounce';
 
 type Props = {
+  isActiveTab: boolean;
   path: string;
 };
 
-export const ViewerTab: FC<Props> = ({ path }) => {
+export const ViewerTab: FC<Props> = ({ isActiveTab, path }) => {
   const [tree, setTree] = useState<DirectoryTree[]>([]);
   const [currentDir, setCurrentDir] = useState<(File | Zip)[]>([]);
+  const currentDirRef = useRef<(File | Zip)[]>();
+  const isActiveTabRef = useRef<boolean>();
+  currentDirRef.current = currentDir;
+  isActiveTabRef.current = isActiveTab;
   const [viewing, setViewing] = useState<number>(0);
   const [selected, setSelected] = useState<File | Zip>();
   const debouncedSelected = useDebounce(selected, 200);
@@ -61,8 +66,34 @@ export const ViewerTab: FC<Props> = ({ path }) => {
     }
   };
 
+  const moveForward = () => {
+    setViewing((prev) =>
+      currentDirRef.current ? (prev + 1) % currentDirRef.current.length : 0
+    );
+  };
+  const moveBackward = () => {
+    setViewing((prev) =>
+      currentDirRef.current
+        ? (prev - 1 + currentDirRef.current.length) %
+          currentDirRef.current.length
+        : 0
+    );
+  };
+
+  const handleOnKeyDown = useCallback(
+    (event: KeyboardEvent) => {
+      if (!isActiveTabRef.current) return;
+      if (event.key === 'ArrowLeft') moveBackward();
+      else if (event.key === 'ArrowRight') moveForward();
+    },
+    [isActiveTab]
+  );
+
   useEffect(() => {
     readDirAndSetTree();
+    document.addEventListener('keydown', handleOnKeyDown, false);
+    return () =>
+      document.removeEventListener('keydown', handleOnKeyDown, false);
   }, []);
 
   const extractFirstFiles = useCallback((entries: DirectoryTree[]): File[] => {
@@ -132,25 +163,8 @@ export const ViewerTab: FC<Props> = ({ path }) => {
     files && setViewing(files.page);
   };
 
-  const moveForward = () => {
-    setViewing((prev) => (prev + 1) % currentDir.length);
-  };
-  const moveBackward = () => {
-    setViewing((prev) => (prev - 1 + currentDir.length) % currentDir.length);
-  };
-
   return (
-    <div
-      className="flex flex-row bg-neutral-900 h-full"
-      tabIndex={0}
-      onKeyDown={(e) =>
-        e.key === 'ArrowLeft'
-          ? moveBackward()
-          : e.key === 'ArrowRight'
-          ? moveForward()
-          : undefined
-      }
-    >
+    <div className="flex flex-row bg-neutral-900 h-full">
       <ImageCanvas
         viewing={debouncedSelected}
         moveForward={moveForward}

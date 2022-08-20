@@ -90,7 +90,11 @@ const App = () => {
         handleOnAdd={add}
       >
         {panes.map((pane) => (
-          <ViewerTab key={pane.key} path={pane.path} />
+          <ViewerTab
+            key={pane.key}
+            isActiveTab={pane.key === activeKey}
+            path={pane.path}
+          />
         ))}
       </Tabs>
     </div>
