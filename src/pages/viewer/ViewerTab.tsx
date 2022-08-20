@@ -105,23 +105,26 @@ export const ViewerTab: FC<Props> = ({ isActiveTab, path }) => {
     };
   }, []);
 
-  const extractFirstFiles = useCallback((entries: DirectoryTree[]): File[] => {
-    const files = entries
-      .filter((entry) => entry.type === 'File')
-      .map((entry) => entry as File);
-    if (files.length) {
-      return files;
-    }
+  const extractFirstFiles = useCallback(
+    (entries: DirectoryTree[]): (File | Zip)[] => {
+      const files = entries
+        .filter((entry) => entry.type === 'File' || entry.type === 'Zip')
+        .map((entry) => entry as File | Zip);
+      if (files.length) {
+        return files;
+      }
 
-    const dirs = entries
-      .filter((entry) => entry.type === 'Directory')
-      .map((entry) => entry as Directory);
-    for (const dir of dirs) {
-      const files = extractFirstFiles(dir.children);
-      if (files.length) return files;
-    }
-    return [];
-  }, []);
+      const dirs = entries
+        .filter((entry) => entry.type === 'Directory')
+        .map((entry) => entry as Directory);
+      for (const dir of dirs) {
+        const files = extractFirstFiles(dir.children);
+        if (files.length) return files;
+      }
+      return [];
+    },
+    []
+  );
 
   useEffect(() => {
     const entry = extractFirstFiles(tree);
