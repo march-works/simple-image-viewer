@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api';
+import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { FileEntry, readDir } from '@tauri-apps/api/fs';
 import { FC, useCallback, useEffect, useRef, useState } from 'react';
 import { PathSelection } from '../../features/directory-tree/routes/PathSelection';
@@ -20,6 +21,7 @@ type Props = {
 export const ViewerTab: FC<Props> = ({ isActiveTab, path }) => {
   const [tree, setTree] = useState<DirectoryTree[]>([]);
   const [currentDir, setCurrentDir] = useState<(File | Zip)[]>([]);
+  const unlistenRef = useRef<UnlistenFn>();
   const currentDirRef = useRef<(File | Zip)[]>();
   const isActiveTabRef = useRef<boolean>();
   currentDirRef.current = currentDir;
@@ -90,10 +92,17 @@ export const ViewerTab: FC<Props> = ({ isActiveTab, path }) => {
   );
 
   useEffect(() => {
+    invoke('subscribe_dir_notification', { filepath: path });
+    listen('directory-tree-changed', (event) => {
+      if (event.payload === path) readDirAndSetTree();
+    }).then((unlisten) => (unlistenRef.current = unlisten));
+
     readDirAndSetTree();
     document.addEventListener('keydown', handleOnKeyDown, false);
-    return () =>
+    return () => {
+      unlistenRef.current && unlistenRef.current();
       document.removeEventListener('keydown', handleOnKeyDown, false);
+    };
   }, []);
 
   const extractFirstFiles = useCallback((entries: DirectoryTree[]): File[] => {
