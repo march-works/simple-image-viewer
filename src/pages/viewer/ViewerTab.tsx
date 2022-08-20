@@ -9,7 +9,10 @@ import {
   File,
   Zip,
 } from '../../features/directory-tree/types/DirectoryTree';
-import { isCompressedFile } from '../../features/filepath/utils/checkers';
+import {
+  isCompressedFile,
+  isImageFile,
+} from '../../features/filepath/utils/checkers';
 import { ImageCanvas } from '../../features/image/routes/ImageCanvas';
 import { useDebounce } from '../../hooks/useDebounce';
 
@@ -46,25 +49,40 @@ export const ViewerTab: FC<Props> = ({ isActiveTab, path }) => {
     };
   };
 
+  const filterNonImageFiles = (tree: DirectoryTree[]): DirectoryTree[] => {
+    return tree
+      .map((file) =>
+        file.type === 'Directory'
+          ? {
+              ...file,
+              children: filterNonImageFiles(file.children),
+            }
+          : file
+      )
+      .filter((file) => file.type === 'Directory' || isImageFile(file.name));
+  };
+
   const readDirAndSetTree = async () => {
     if (isCompressedFile(path)) {
       const files = await invoke<string[]>('get_filenames_inner_zip', {
         filepath: path,
       });
       setTree(
-        files.map((file) => {
-          return {
-            type: 'Zip',
-            name: file,
-            path,
-          };
-        })
+        files
+          .filter((file) => isImageFile(file))
+          .map((file) => {
+            return {
+              type: 'Zip',
+              name: file,
+              path,
+            };
+          })
       );
     } else {
       const entries = await readDir(path, {
         recursive: true,
       });
-      setTree(entries.map(convertEntryToTree));
+      setTree(filterNonImageFiles(entries.map(convertEntryToTree)));
     }
   };
 
