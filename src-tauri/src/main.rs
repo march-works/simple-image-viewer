@@ -3,7 +3,36 @@
     windows_subsystem = "windows"
 )]
 
-use std::io::Read;
+use std::{io::Read, sync::mpsc::channel, time::Duration};
+
+use notify::{watcher, RecursiveMode, Watcher};
+use tauri::Window;
+
+#[tauri::command]
+fn subscribe_dir_notification(filepath: String, window: Window) {
+    std::thread::spawn(move || {
+        let (sender, receiver) = channel();
+        let mut watcher = watcher(sender, Duration::from_secs(10)).unwrap();
+        watcher.watch(&filepath, RecursiveMode::Recursive).unwrap();
+        loop {
+            match receiver.recv() {
+                Ok(_) => {
+                    window
+                        .emit("directory-tree-changed", &filepath)
+                        .unwrap_or_default();
+                }
+                Err(_) => {
+                    window
+                        .emit(
+                            "directory-watch-error",
+                            "Error occured while directory watching",
+                        )
+                        .unwrap_or_default();
+                }
+            }
+        }
+    });
+}
 
 #[tauri::command]
 fn open_file_image(filepath: String) -> String {
@@ -16,11 +45,7 @@ fn get_filenames_inner_zip(filepath: String) -> Vec<String> {
     let file = std::fs::read(filepath).unwrap_or_default();
     let zip = zip::ZipArchive::new(std::io::Cursor::new(file));
     let mut files = zip
-        .map(|f| {
-            f.file_names()
-                .map(|s| s.to_string())
-                .collect::<Vec<String>>()
-        })
+        .map(|f| f.file_names().map(|s| s.into()).collect::<Vec<String>>())
         .unwrap_or_default();
     files.sort();
     files
@@ -35,15 +60,14 @@ fn read_image_in_zip(path: String, filename: String) -> String {
             let inner = e.by_name(&filename);
             match inner {
                 Ok(mut f) => {
-                    let size: usize = f.size().try_into().unwrap_or_default();
-                    let mut buf = vec![0 as u8; size];
-                    f.read_exact(&mut buf).unwrap_or_default();
+                    let mut buf = vec![];
+                    f.read_to_end(&mut buf).unwrap_or_default();
                     base64::encode(&buf)
                 }
-                Err(_) => "".to_string(),
+                Err(_) => "".into(),
             }
         }
-        Err(_) => "".to_string(),
+        Err(_) => "".into(),
     }
 }
 
@@ -53,6 +77,7 @@ fn main() {
             open_file_image,
             get_filenames_inner_zip,
             read_image_in_zip,
+            subscribe_dir_notification,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
