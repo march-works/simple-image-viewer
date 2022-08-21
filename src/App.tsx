@@ -22,6 +22,7 @@ const App = () => {
       title: string;
       key: string;
       path: string;
+      initFilePath?: string;
     }[]
   >([]);
   const newTabIndex = useRef(0);
@@ -48,6 +49,7 @@ const App = () => {
       title: title,
       key: newActiveKey,
       path: path,
+      initFilePath: isImageFile(dir) ? dir : undefined,
     });
     setPanes(newPanes);
     setActiveKey(newActiveKey);
@@ -105,6 +107,7 @@ const App = () => {
             key={pane.key}
             isActiveTab={pane.key === activeKey}
             path={pane.path}
+            initFilePath={pane.initFilePath}
           />
         ))}
       </Tabs>

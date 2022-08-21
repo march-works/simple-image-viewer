@@ -19,9 +19,10 @@ import { useDebounce } from '../../hooks/useDebounce';
 type Props = {
   isActiveTab: boolean;
   path: string;
+  initFilePath?: string;
 };
 
-export const ViewerTab: FC<Props> = ({ isActiveTab, path }) => {
+export const ViewerTab: FC<Props> = ({ isActiveTab, path, initFilePath }) => {
   const [tree, setTree] = useState<DirectoryTree[]>([]);
   const [currentDir, setCurrentDir] = useState<(File | Zip)[]>([]);
   const unlistenRef = useRef<UnlistenFn>();
@@ -145,9 +146,13 @@ export const ViewerTab: FC<Props> = ({ isActiveTab, path }) => {
   );
 
   useEffect(() => {
-    const entry = extractFirstFiles(tree);
-    entry && setCurrentDir(entry);
-    entry && setViewing(0);
+    if (initFilePath) {
+      handleOnSelectedChanged(initFilePath);
+    } else {
+      const entry = extractFirstFiles(tree);
+      entry && setCurrentDir(entry);
+      entry && setViewing(0);
+    }
   }, [tree, extractFirstFiles]);
 
   useEffect(() => {
