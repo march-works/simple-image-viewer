@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { open } from '@tauri-apps/api/dialog';
 import { Tabs } from './components/Tab/Tabs';
 import { ViewerTab } from './pages/viewer/ViewerTab';
@@ -13,6 +13,7 @@ import {
   getParentDirectoryName,
   getParentDirectoryPath,
 } from './features/filepath/utils/converters';
+import { getMatches } from '@tauri-apps/api/cli';
 
 const App = () => {
   const [activeKey, setActiveKey] = useState<string>();
@@ -26,6 +27,29 @@ const App = () => {
   const newTabIndex = useRef(0);
 
   const onChange = (newActiveKey: string) => {
+    setActiveKey(newActiveKey);
+  };
+
+  useEffect(() => {
+    getMatches().then((matches) => {
+      const filepath = matches.args.filepath.value;
+      typeof filepath === 'string' && createNewTab(filepath);
+    });
+  }, []);
+
+  const createNewTab = (dir: string) => {
+    const newActiveKey = `newTab${newTabIndex.current++}`;
+    const newPanes = [...panes];
+    const title = isImageFile(dir)
+      ? getParentDirectoryName(dir)
+      : getFileNameWithoutExtension(dir);
+    const path = isCompressedFile(dir) ? dir : getParentDirectoryPath(dir);
+    newPanes.push({
+      title: title,
+      key: newActiveKey,
+      path: path,
+    });
+    setPanes(newPanes);
     setActiveKey(newActiveKey);
   };
 
@@ -44,20 +68,7 @@ const App = () => {
     if (!dir) {
       return;
     }
-
-    const newActiveKey = `newTab${newTabIndex.current++}`;
-    const newPanes = [...panes];
-    const title = isImageFile(dir)
-      ? getParentDirectoryName(dir)
-      : getFileNameWithoutExtension(dir);
-    const path = isCompressedFile(dir) ? dir : getParentDirectoryPath(dir);
-    newPanes.push({
-      title: title,
-      key: newActiveKey,
-      path: path,
-    });
-    setPanes(newPanes);
-    setActiveKey(newActiveKey);
+    createNewTab(dir);
   };
 
   const remove = (targetKey: string) => {

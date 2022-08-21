@@ -64,6 +64,15 @@
         "title": "Tauri Demo",
         "width": 800
       }
-    ]
+    ],
+    "cli": {
+      "args": [
+        {
+          "name": "filepath",
+          "index": 1,
+          "takesValue": true
+        }
+      ]
+    }
   }
 }
