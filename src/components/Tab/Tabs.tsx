@@ -33,6 +33,7 @@ export const Tabs: FC<Props> = ({
               'flex flex-row w-48 justify-between p-1 m-t-2 border-2 border-b-0 rounded-t-md border-neutral-500 min-w-0' +
               (tab.key === viewing ? ' bg-neutral-500' : '')
             }
+            onMouseDown={(e) => e.button === 1 && handleOnClose(tab.key)}
           >
             <div
               className="flex-1 self-center cursor-pointer truncate"
