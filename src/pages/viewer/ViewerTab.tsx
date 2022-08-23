@@ -110,6 +110,15 @@ export const ViewerTab: FC<Props> = ({ isActiveTab, path, initFilePath }) => {
     [isActiveTab]
   );
 
+  const handleOnButtonDown = useCallback(
+    (event: MouseEvent) => {
+      if (!isActiveTabRef.current) return;
+      if (event.button === 3) moveBackward();
+      else if (event.button === 4) moveForward();
+    },
+    [isActiveTab]
+  );
+
   useEffect(() => {
     invoke('subscribe_dir_notification', { filepath: path });
     listen('directory-tree-changed', (event) => {
@@ -118,9 +127,11 @@ export const ViewerTab: FC<Props> = ({ isActiveTab, path, initFilePath }) => {
 
     readDirAndSetTree();
     document.addEventListener('keydown', handleOnKeyDown, false);
+    document.addEventListener('mouseup', handleOnButtonDown, false);
     return () => {
       unlistenRef.current && unlistenRef.current();
       document.removeEventListener('keydown', handleOnKeyDown, false);
+      document.removeEventListener('mouseup', handleOnButtonDown, false);
     };
   }, []);
 
