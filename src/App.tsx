@@ -14,17 +14,19 @@ import {
   getParentDirectoryPath,
 } from './features/filepath/utils/converters';
 import { getMatches } from '@tauri-apps/api/cli';
+import { BaseDirectory, readTextFile, writeTextFile } from '@tauri-apps/api/fs';
+
+type TabState = {
+  title: string;
+  key: string;
+  path: string;
+  initFilePath?: string;
+}[];
 
 const App = () => {
+  const savePath = 'tabstate.sav';
   const [activeKey, setActiveKey] = useState<string>();
-  const [panes, setPanes] = useState<
-    {
-      title: string;
-      key: string;
-      path: string;
-      initFilePath?: string;
-    }[]
-  >([]);
+  const [panes, setPanes] = useState<TabState>([]);
   const newTabIndex = useRef(0);
 
   const onChange = (newActiveKey: string) => {
@@ -32,26 +34,66 @@ const App = () => {
   };
 
   useEffect(() => {
+    readTextFile(savePath, { dir: BaseDirectory.LocalData }).then(
+      (tabState) => {
+        const state = JSON.parse(tabState) as { title: string; path: string }[];
+        restoreTab(state);
+      }
+    );
     getMatches().then((matches) => {
       const filepath = matches.args.filepath.value;
       typeof filepath === 'string' && createNewTab(filepath);
     });
   }, []);
 
+  useEffect(() => {
+    writeTextFile(
+      savePath,
+      JSON.stringify(
+        panes.map((pane) => {
+          return {
+            title: pane.title,
+            path: pane.path,
+          };
+        })
+      ),
+      { dir: BaseDirectory.LocalData }
+    );
+  }, [panes]);
+
+  const restoreTab = (dirs: { title: string; path: string }[]) => {
+    const restored = dirs.map(({ title, path }) => {
+      const newActiveKey = `newTab${newTabIndex.current++}`;
+      return {
+        title,
+        key: newActiveKey,
+        path,
+        initFilePath: undefined,
+      };
+    });
+    setPanes((prevPanes) => {
+      const newPanes = [...prevPanes, ...restored];
+      return newPanes;
+    });
+    restored.length && setActiveKey(restored[restored.length - 1].key);
+  };
+
   const createNewTab = (dir: string) => {
     const newActiveKey = `newTab${newTabIndex.current++}`;
-    const newPanes = [...panes];
-    const title = isImageFile(dir)
-      ? getParentDirectoryName(dir)
-      : getFileNameWithoutExtension(dir);
-    const path = isCompressedFile(dir) ? dir : getParentDirectoryPath(dir);
-    newPanes.push({
-      title: title,
-      key: newActiveKey,
-      path: path,
-      initFilePath: isImageFile(dir) ? dir : undefined,
+    setPanes((prevPanes) => {
+      const newPanes = [...prevPanes];
+      const title = isImageFile(dir)
+        ? getParentDirectoryName(dir)
+        : getFileNameWithoutExtension(dir);
+      const path = isCompressedFile(dir) ? dir : getParentDirectoryPath(dir);
+      newPanes.push({
+        title: title,
+        key: newActiveKey,
+        path: path,
+        initFilePath: isImageFile(dir) ? dir : undefined,
+      });
+      return newPanes;
     });
-    setPanes(newPanes);
     setActiveKey(newActiveKey);
   };
 
