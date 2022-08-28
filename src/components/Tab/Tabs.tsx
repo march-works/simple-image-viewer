@@ -31,7 +31,9 @@ export const Tabs: FC<Props> = ({
             key={tab.key}
             className={
               'flex flex-row w-48 justify-between p-1 m-t-2 border-2 border-b-0 rounded-t-md border-neutral-500 min-w-0' +
-              (tab.key === viewing ? ' bg-neutral-500' : '')
+              (tab.key === viewing
+                ? ' bg-neutral-600 text-neutral-100'
+                : ' text-neutral-400')
             }
             onMouseDown={(e) => e.button === 1 && handleOnClose(tab.key)}
           >
@@ -50,7 +52,11 @@ export const Tabs: FC<Props> = ({
           </div>
         ))}
         <div className="flex flex-col shrink-0 w-8 h-8 border-2 rounded-full ml-1 items-center justify-center border-neutral-500">
-          <FolderOpenOutlined className="text-xl" onClick={handleOnAdd} />
+          <FolderOpenOutlined
+            className="text-xl ml-px"
+            style={{ lineHeight: '1rem' }}
+            onClick={handleOnAdd}
+          />
         </div>
       </div>
       <div className="relative" style={{ height: 'calc(100% - 2rem)' }}>
