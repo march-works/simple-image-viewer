@@ -1,6 +1,5 @@
 import { LeftOutlined, RightOutlined } from '@ant-design/icons';
 import { invoke } from '@tauri-apps/api/tauri';
-import SkeletonImage from 'antd/lib/skeleton/Image';
 import { FC, useCallback, useEffect, useState } from 'react';
 import { match } from 'ts-pattern';
 import { File, Zip } from '../../directory-tree/types/DirectoryTree';
@@ -59,7 +58,7 @@ export const ImageCanvas: FC<Props> = ({
       </div>
       <div className="flex content-center justify-center flex-1">
         {loading ? (
-          <SkeletonImage className="self-center object-fit" />
+          <div className="self-center object-fit">Loading</div>
         ) : (
           <img
             className="object-contain"

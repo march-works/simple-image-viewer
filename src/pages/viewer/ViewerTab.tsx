@@ -210,7 +210,7 @@ export const ViewerTab: FC<Props> = ({ isActiveTab, path, initFilePath }) => {
   };
 
   return (
-    <div className="flex flex-row bg-neutral-900 h-full">
+    <div className="flex flex-row h-full">
       <ImageCanvas
         viewing={debouncedSelected}
         moveForward={moveForward}
