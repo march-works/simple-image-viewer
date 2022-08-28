@@ -1,6 +1,7 @@
 import { LeftOutlined, RightOutlined } from '@ant-design/icons';
 import { invoke } from '@tauri-apps/api/tauri';
 import { FC, useCallback, useEffect, useState } from 'react';
+import { Puff } from 'react-loader-spinner';
 import { match } from 'ts-pattern';
 import { File, Zip } from '../../directory-tree/types/DirectoryTree';
 
@@ -56,15 +57,17 @@ export const ImageCanvas: FC<Props> = ({
       <div className="flex items-center cursor-pointer" onClick={moveBackward}>
         <LeftOutlined className="p-2 text-xl" />
       </div>
-      <div className="flex content-center justify-center flex-1">
-        {loading ? (
-          <div className="self-center object-fit">Loading</div>
-        ) : (
-          <img
-            className="object-contain"
-            src={`data:image/jpeg;base64,${data}`}
-          />
-        )}
+      <div className="relative flex content-center justify-center flex-1">
+        <Puff
+          visible={loading}
+          width={30}
+          wrapperClass="absolute bottom-1 right-1"
+          color="#FFFFFF"
+        />
+        <img
+          className="object-contain"
+          src={`data:image/jpeg;base64,${data}`}
+        />
       </div>
       <div className="flex items-center cursor-pointer" onClick={moveForward}>
         <RightOutlined className="p-2 text-xl" />
