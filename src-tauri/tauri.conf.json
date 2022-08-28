@@ -7,7 +7,7 @@
     "distDir": "../build"
   },
   "package": {
-    "productName": "tauri-demo",
+    "productName": "simple-image-viewer",
     "version": "0.1.0"
   },
   "tauri": {
@@ -32,7 +32,7 @@
         "icons/icon.icns",
         "icons/icon.ico"
       ],
-      "identifier": "com.tauridemo.maruyamas",
+      "identifier": "com.simple-image-viewer.maruyamas",
       "longDescription": "",
       "macOS": {
         "entitlements": null,
@@ -61,7 +61,7 @@
         "fullscreen": false,
         "height": 600,
         "resizable": true,
-        "title": "Tauri Demo",
+        "title": "Simple Image Viewer",
         "width": 800
       }
     ],
