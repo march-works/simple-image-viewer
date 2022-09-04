@@ -78,7 +78,6 @@ pub struct ActiveWindow {
 
 #[tauri::command]
 fn change_active_window(window: Window, active: State<ActiveWindow>) {
-    println!("{:?}", window.label());
     match active.label.lock() {
         Ok(mut label) => *label = window.label().to_string(),
         Err(_) => (),
