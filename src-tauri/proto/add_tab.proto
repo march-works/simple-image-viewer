@@ -1,0 +1,14 @@
+syntax = "proto3";
+package add_tab;
+
+service FilePathTransfer {
+    rpc TransferFilePath (FilePathTransferRequest) returns (FilePathTransferResponse);
+}
+
+message FilePathTransferRequest {
+    string path = 1;
+}
+
+message FilePathTransferResponse {
+    uint32 result = 1;
+}
