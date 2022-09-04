@@ -26,7 +26,6 @@ impl FilePathTransfer for Transferer {
         &self,
         request: Request<FilePathTransferRequest>,
     ) -> Result<Response<FilePathTransferResponse>, Status> {
-        println!("Got a request: {:?}", request);
         let active = self.app.state::<ActiveWindow>();
         active.label.lock().map_or_else(
             |_| {

@@ -9,7 +9,6 @@ use crate::{
 
 pub async fn run_server(app: AppHandle) -> Result<(), anyhow::Error> {
     let addr = "[::1]:50052".parse()?;
-    println!("server listening...");
     let res = Server::builder()
         .add_service(FilePathTransferServer::new(Transferer::new(app.clone())))
         .add_service(NewWindowOpenedServer::new(Opener::new(app.clone())))
@@ -17,8 +16,7 @@ pub async fn run_server(app: AppHandle) -> Result<(), anyhow::Error> {
         .await;
     match res {
         Ok(()) => Ok(()),
-        Err(e) => {
-            println!("server error!!!: {:?}", e);
+        Err(_) => {
             Ok(())
         }
     }
