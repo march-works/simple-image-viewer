@@ -16,8 +16,6 @@ pub async fn run_server(app: AppHandle) -> Result<(), anyhow::Error> {
         .await;
     match res {
         Ok(()) => Ok(()),
-        Err(_) => {
-            Ok(())
-        }
+        Err(_) => Ok(()),
     }
 }
