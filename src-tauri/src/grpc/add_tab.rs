@@ -40,7 +40,11 @@ impl FilePathTransfer for Transferer {
                         "image-file-opened",
                         request.get_ref().path.clone(),
                     )
-                    .unwrap_or(())
+                    .unwrap_or_else(|_| {
+                        self.app
+                            .emit_all("image-file-opened", request.get_ref().path.clone())
+                            .unwrap_or(())
+                    })
             },
         );
 
