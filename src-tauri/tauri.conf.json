@@ -32,7 +32,7 @@
         "icons/icon.icns",
         "icons/icon.ico"
       ],
-      "identifier": "com.simple-image-viewer.maruyamas",
+      "identifier": "com.simple-image-viewer.march",
       "longDescription": "",
       "macOS": {
         "entitlements": null,
@@ -62,7 +62,8 @@
         "height": 600,
         "resizable": true,
         "title": "Simple Image Viewer",
-        "width": 800
+        "width": 800,
+        "maximized": true
       }
     ],
     "cli": {

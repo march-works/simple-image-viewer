@@ -50,7 +50,9 @@ const App = () => {
 
     getMatches().then((matches) => {
       const filepath = matches.args.filepath.value;
-      typeof filepath === 'string' && createNewTab(filepath);
+      typeof filepath === 'string' &&
+        appWindow.label === 'main' &&
+        createNewTab(filepath);
     });
 
     return () => {

@@ -33,6 +33,9 @@ impl NewWindowOpened for Opener {
             format!("label-{}", self.count.lock().await),
             tauri::WindowUrl::App("index.html".into()),
         )
+        .focus()
+        .title("Simple Image Viewer")
+        .maximized(true)
         .build()
         .map_err(|_| Status::failed_precondition("system unavailable"))?;
         self.count.lock().await.add_assign(1);
@@ -42,7 +45,7 @@ impl NewWindowOpened for Opener {
 }
 
 pub async fn open(handler: AppHandle) -> Result<(), anyhow::Error> {
-    let mut client = NewWindowOpenedClient::connect("[::1]:50052").await?;
+    let mut client = NewWindowOpenedClient::connect("http://[::1]:50052").await?;
     let request = tonic::Request::new(OpenNewWindowRequest {});
     client.open_new_window(request).await?;
     handler.exit(0);

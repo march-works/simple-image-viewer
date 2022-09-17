@@ -115,13 +115,16 @@ fn get_running_count() -> i32 {
 pub fn open_new_viewer() -> Builder<Wry> {
     tauri::Builder::default()
         .setup(|app| {
+            // when other process already running
             if get_running_count() > 1 {
                 match app.get_cli_matches() {
                     Ok(matches) => match &matches.args.get("filepath").map(|v| v.value.clone()) {
                         Some(Value::String(val)) => {
+                            // when executed with file path
                             tokio::spawn(add_tab::transfer(val.to_string(), app.app_handle()));
                         }
                         _ => {
+                            // when executed without file path
                             tokio::spawn(new_window::open(app.app_handle()));
                         }
                     },
