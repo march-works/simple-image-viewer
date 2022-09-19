@@ -1,6 +1,8 @@
-import { FileOutlined } from '@ant-design/icons';
+import { faImage } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { FC, useEffect, useRef } from 'react';
 import { DirectoryTree, Zip } from '../types/DirectoryTree';
+import { NodeBaseStyle } from './NodeBaseStyle';
 
 type Props = {
   node: Zip;
@@ -24,15 +26,14 @@ export const ZipNode: FC<Props> = ({ node, selected, onClick }) => {
   }, [selected]);
 
   return (
-    <div
+    <NodeBaseStyle
+      className="pl-3"
       ref={nodeRef}
+      isSelected={isSelected}
       onClick={() => onClick && onClick(node.path + node.name)}
-      className={`text-base ml-4 truncate flex flex-row cursor-pointer items-baseline gap-1 text-neutral-400 hover:bg-neutral-800 hover:text-neutral-300${
-        isSelected ? ' !bg-neutral-600 !text-neutral-100' : ''
-      }`}
     >
-      <FileOutlined />
-      {node.name}
-    </div>
+      <FontAwesomeIcon icon={faImage} />
+      <div className="hidden lg:block">{node.name}</div>
+    </NodeBaseStyle>
   );
 };

@@ -1,4 +1,5 @@
-import { CloseOutlined, FolderOpenOutlined } from '@ant-design/icons';
+import { faFolderOpen, faXmark } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { FC, ReactElement } from 'react';
 
 type TabInfo = {
@@ -24,39 +25,35 @@ export const Tabs: FC<Props> = ({
   children,
 }) => {
   return (
-    <div className="flex flex-col flex-1 w-full relative">
-      <div className="flex flex-row flex-none h-8 bg-neutral-800 w-full">
+    <div className="relative flex w-full flex-1 flex-col">
+      <div className="flex h-8 w-full flex-none flex-row bg-neutral-800 align-baseline">
         {tabs.map((tab) => (
           <div
             key={tab.key}
             className={
-              'flex flex-row w-48 justify-between p-1 m-t-2 border-2 border-b-0 rounded-t-md border-neutral-500 min-w-0' +
+              'flex w-48 min-w-0 flex-row justify-between items-end rounded-t-md border-2 border-b-0 border-neutral-500 p-1 transition-colors' +
               (tab.key === viewing
-                ? ' bg-neutral-600 text-neutral-100'
-                : ' text-neutral-400')
+                ? ' bg-gradient-to-b from-neutral-500 to-neutral-900 text-neutral-100'
+                : ' bg-neutral-900 text-neutral-400 hover:bg-gradient-to-b hover:from-neutral-600 hover:to-neutral-900 hover:text-neutral-300')
             }
             onMouseDown={(e) => e.button === 1 && handleOnClose(tab.key)}
           >
             <div
-              className="flex-1 self-center cursor-pointer truncate"
+              className="flex-1 self-center truncate"
               onClick={() => handleOnClick(tab.key)}
             >
               {tab.title}
             </div>
             <div
-              className="flex flex-col justify-center cursor-pointer w-4"
+              className="flex pt-0.5 h-5 w-5 justify-center rounded-full text-neutral-100 transition-colors hover:bg-neutral-500"
               onClick={() => handleOnClose(tab.key)}
             >
-              <CloseOutlined />
+              <FontAwesomeIcon icon={faXmark} />
             </div>
           </div>
         ))}
-        <div className="flex flex-col shrink-0 w-8 h-8 border-2 rounded-full ml-1 items-center justify-center border-neutral-500">
-          <FolderOpenOutlined
-            className="text-xl ml-px"
-            style={{ lineHeight: '1rem' }}
-            onClick={handleOnAdd}
-          />
+        <div className="ml-1 flex h-8 w-8 shrink-0 flex-col items-center justify-center rounded-full border-2 border-neutral-500 bg-neutral-900 text-neutral-400 transition-colors hover:bg-neutral-700 hover:text-neutral-300">
+          <FontAwesomeIcon className='ml-0.5' icon={faFolderOpen} onClick={handleOnAdd} />
         </div>
       </div>
       <div className="relative" style={{ height: 'calc(100% - 2rem)' }}>
