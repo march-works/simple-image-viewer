@@ -1,4 +1,5 @@
-import { CloseOutlined, FolderOpenOutlined } from '@ant-design/icons';
+import { faFolderOpen, faXmark } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { FC, ReactElement } from 'react';
 
 type TabInfo = {
@@ -30,7 +31,7 @@ export const Tabs: FC<Props> = ({
           <div
             key={tab.key}
             className={
-              'flex w-48 min-w-0 flex-row justify-between rounded-t-md border-2 border-b-0 border-neutral-500 p-1 transition-colors' +
+              'flex w-48 min-w-0 flex-row justify-between items-end rounded-t-md border-2 border-b-0 border-neutral-500 p-1 transition-colors' +
               (tab.key === viewing
                 ? ' bg-gradient-to-b from-neutral-500 to-neutral-900 text-neutral-100'
                 : ' bg-neutral-900 text-neutral-400 hover:bg-gradient-to-b hover:from-neutral-600 hover:to-neutral-900 hover:text-neutral-300')
@@ -44,19 +45,15 @@ export const Tabs: FC<Props> = ({
               {tab.title}
             </div>
             <div
-              className="flex h-5 w-5 justify-center rounded-full text-neutral-100 transition-colors hover:bg-neutral-500"
+              className="flex pt-0.5 h-5 w-5 justify-center rounded-full text-neutral-100 transition-colors hover:bg-neutral-500"
               onClick={() => handleOnClose(tab.key)}
             >
-              <CloseOutlined className="text-xs" />
+              <FontAwesomeIcon icon={faXmark} />
             </div>
           </div>
         ))}
         <div className="ml-1 flex h-8 w-8 shrink-0 flex-col items-center justify-center rounded-full border-2 border-neutral-500 bg-neutral-900 text-neutral-400 transition-colors hover:bg-neutral-700 hover:text-neutral-300">
-          <FolderOpenOutlined
-            className="ml-px text-xl"
-            style={{ lineHeight: '1rem', cursor: 'default' }}
-            onClick={handleOnAdd}
-          />
+          <FontAwesomeIcon className='ml-0.5' icon={faFolderOpen} onClick={handleOnAdd} />
         </div>
       </div>
       <div className="relative" style={{ height: 'calc(100% - 2rem)' }}>

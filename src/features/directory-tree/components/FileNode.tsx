@@ -1,4 +1,5 @@
-import { FileOutlined } from '@ant-design/icons';
+import { faImage } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { FC, useEffect, useRef } from 'react';
 import { DirectoryTree, File } from '../types/DirectoryTree';
 import { NodeBaseStyle } from './NodeBaseStyle';
@@ -23,12 +24,12 @@ export const FileNode: FC<Props> = ({ node, selected, onClick }) => {
   }, [selected]);
   return (
     <NodeBaseStyle
-      className="pl-4"
+      className="pl-3"
       ref={nodeRef}
       isSelected={node.path === selected?.path}
       onClick={() => onClick && onClick(node.path)}
     >
-      <FileOutlined />
+      <FontAwesomeIcon icon={faImage} />
       <div className="hidden lg:block">{node.name}</div>
     </NodeBaseStyle>
   );
