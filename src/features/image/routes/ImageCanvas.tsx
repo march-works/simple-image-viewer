@@ -1,4 +1,5 @@
-import { LeftOutlined, RightOutlined } from '@ant-design/icons';
+import { faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { invoke } from '@tauri-apps/api/tauri';
 import { FC, useCallback, useEffect, useState } from 'react';
 import { Puff } from 'react-loader-spinner';
@@ -58,7 +59,7 @@ export const ImageCanvas: FC<Props> = ({
         className="flex cursor-pointer items-center opacity-50 transition-colors hover:bg-neutral-800 hover:opacity-100"
         onClick={moveBackward}
       >
-        <LeftOutlined className="p-2 text-4xl" />
+        <FontAwesomeIcon className="p-2 text-4xl" icon={faChevronLeft} />
       </div>
       <div className="relative flex flex-1 content-center justify-center">
         <Puff
@@ -76,7 +77,7 @@ export const ImageCanvas: FC<Props> = ({
         className="flex cursor-pointer items-center opacity-50 transition-colors hover:bg-neutral-800 hover:opacity-100"
         onClick={moveForward}
       >
-        <RightOutlined className="p-2 text-4xl" />
+        <FontAwesomeIcon className="p-2 text-4xl" icon={faChevronRight} />
       </div>
     </div>
   );

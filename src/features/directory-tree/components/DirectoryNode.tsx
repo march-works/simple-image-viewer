@@ -1,9 +1,5 @@
-import {
-  CaretDownOutlined,
-  CaretRightOutlined,
-  FolderOpenOutlined,
-  FolderOutlined,
-} from '@ant-design/icons';
+import { faCaretDown, faCaretRight, faFolder, faFolderOpen } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { FC, useState } from 'react';
 import { match } from 'ts-pattern';
 import { Directory, DirectoryTree } from '../types/DirectoryTree';
@@ -28,11 +24,11 @@ export const DirectoryNode: FC<Props> = ({ tree, selected, onClick }) => {
         }}
       >
         {open ? (
-          <CaretDownOutlined className="block text-xs" />
+          <FontAwesomeIcon icon={faCaretDown} />
         ) : (
-          <CaretRightOutlined className="block text-xs" />
+          <FontAwesomeIcon icon={faCaretRight} />
         )}
-        {open ? <FolderOpenOutlined /> : <FolderOutlined />}
+        {open ? <FontAwesomeIcon icon={faFolderOpen} /> : <FontAwesomeIcon icon={faFolder} />}
         <div className="hidden truncate lg:block">{tree.name}</div>
       </NodeBaseStyle>
       {tree.children.length > 0 && open && (
