@@ -13,7 +13,7 @@ type Props = {
 
 export const DirectoryList: FC<Props> = ({ selected, tree, onClick }) => {
   return (
-    <div className="flex flex-col gap-1">
+    <div className="flex flex-col">
       {tree.map((node) =>
         match(node)
           .with({ type: 'Directory' }, (nd) => (

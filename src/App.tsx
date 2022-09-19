@@ -118,7 +118,7 @@ const App = () => {
   };
 
   return (
-    <div className="App h-screen w-screen flex bg-neutral-900 text-neutral-100 select-none">
+    <div className="App flex h-screen w-screen select-none bg-neutral-900 text-neutral-100">
       <Tabs
         viewing={activeKey}
         tabs={panes}

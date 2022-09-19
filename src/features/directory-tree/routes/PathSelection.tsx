@@ -14,7 +14,7 @@ export const PathSelection: FC<Props> = ({
   onSelectedChanged,
 }) => {
   return (
-    <div className="flex flex-col flex-1 space-y-2 max-w-0 md:max-w-xs">
+    <div className="flex max-w-max flex-1 flex-col space-y-2 lg:max-w-xs">
       <div className="overflow-y-auto">
         <DirectoryList
           selected={selected}
