@@ -55,12 +55,12 @@ export const ImageCanvas: FC<Props> = ({
   return (
     <div className="flex flex-row content-center" style={{ flex: 4 }}>
       <div
-        className="flex items-center cursor-pointer opacity-50 hover:bg-neutral-800 hover:opacity-100"
+        className="flex cursor-pointer items-center opacity-50 transition-colors hover:bg-neutral-800 hover:opacity-100"
         onClick={moveBackward}
       >
         <LeftOutlined className="p-2 text-4xl" />
       </div>
-      <div className="relative flex content-center justify-center flex-1">
+      <div className="relative flex flex-1 content-center justify-center">
         <Puff
           visible={loading}
           width={30}
@@ -73,7 +73,7 @@ export const ImageCanvas: FC<Props> = ({
         />
       </div>
       <div
-        className="flex items-center cursor-pointer opacity-50 hover:bg-neutral-800 hover:opacity-100"
+        className="flex cursor-pointer items-center opacity-50 transition-colors hover:bg-neutral-800 hover:opacity-100"
         onClick={moveForward}
       >
         <RightOutlined className="p-2 text-4xl" />
