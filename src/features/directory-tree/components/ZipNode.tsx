@@ -26,12 +26,13 @@ export const ZipNode: FC<Props> = ({ node, selected, onClick }) => {
 
   return (
     <NodeBaseStyle
+      className="pl-4"
       ref={nodeRef}
       isSelected={isSelected}
       onClick={() => onClick && onClick(node.path + node.name)}
     >
       <FileOutlined />
-      <>{node.name}</>
+      <div className="hidden lg:block">{node.name}</div>
     </NodeBaseStyle>
   );
 };
