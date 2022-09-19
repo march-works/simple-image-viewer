@@ -8,6 +8,7 @@ import { FC, useState } from 'react';
 import { match } from 'ts-pattern';
 import { Directory, DirectoryTree } from '../types/DirectoryTree';
 import { FileNode } from './FileNode';
+import { NodeBaseStyle } from './NodeBaseStyle';
 import { ZipNode } from './ZipNode';
 
 type Props = {
@@ -20,8 +21,7 @@ export const DirectoryNode: FC<Props> = ({ tree, selected, onClick }) => {
   const [open, setOpen] = useState<boolean>(false);
   return (
     <div className="w-full">
-      <div
-        className="text-base truncate flex flex-row items-baseline gap-1 w-full cursor-pointer text-neutral-100 hover:bg-neutral-600"
+      <NodeBaseStyle
         onClick={() => {
           onClick && onClick(tree.path);
           setOpen((prev) => !prev);
@@ -34,7 +34,7 @@ export const DirectoryNode: FC<Props> = ({ tree, selected, onClick }) => {
         )}
         {open ? <FolderOpenOutlined /> : <FolderOutlined />}
         <div className="truncate">{tree.name}</div>
-      </div>
+      </NodeBaseStyle>
       {tree.children.length > 0 && open && (
         <div className="ml-6">
           {tree.children.map((node) =>
