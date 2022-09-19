@@ -23,12 +23,13 @@ export const FileNode: FC<Props> = ({ node, selected, onClick }) => {
   }, [selected]);
   return (
     <NodeBaseStyle
+      className="pl-4"
       ref={nodeRef}
       isSelected={node.path === selected?.path}
       onClick={() => onClick && onClick(node.path)}
     >
       <FileOutlined />
-      <>{node.name}</>
+      <div className="hidden lg:block">{node.name}</div>
     </NodeBaseStyle>
   );
 };

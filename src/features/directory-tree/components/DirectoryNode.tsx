@@ -33,10 +33,10 @@ export const DirectoryNode: FC<Props> = ({ tree, selected, onClick }) => {
           <CaretRightOutlined className="block text-xs" />
         )}
         {open ? <FolderOpenOutlined /> : <FolderOutlined />}
-        <div className="truncate">{tree.name}</div>
+        <div className="hidden truncate lg:block">{tree.name}</div>
       </NodeBaseStyle>
       {tree.children.length > 0 && open && (
-        <div className="ml-6">
+        <div className="lg:ml-6">
           {tree.children.map((node) =>
             match(node)
               .with({ type: 'Directory' }, (nd) => (
