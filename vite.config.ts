@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite';
 import solidPlugin from 'vite-plugin-solid';
-import resolve from '@rollup/plugin-node-resolve'
+import path from 'path';
 
 export default defineConfig({
   plugins: [solidPlugin()],
@@ -24,11 +24,9 @@ export default defineConfig({
     // produce sourcemaps for debug builds
     sourcemap: !!process.env.TAURI_DEBUG,
     rollupOptions: {
-      plugins: [
-        resolve({
-          extensions: ['.js', '.ts']
-        })
-      ]
+      input: {
+        index: path.resolve(__dirname, 'src/index.tsx'),
+      }
     }
   },
 });
