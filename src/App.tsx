@@ -1,17 +1,17 @@
 import { open } from '@tauri-apps/api/dialog';
 import { Tabs } from './components/Tab/Tabs';
 import { ViewerTab } from './pages/viewer/ViewerTab';
-import { ImageExtensions } from './features/filepath/consts/images';
-import { CompressedExtensions } from './features/filepath/consts/compressed';
+import { ImageExtensions } from './features/FilePath/consts/Images';
+import { CompressedExtensions } from './features/FilePath/consts/Compressed';
 import {
   isCompressedFile,
   isImageFile,
-} from './features/filepath/utils/checkers';
+} from './features/FilePath/utils/Checkers';
 import {
   getFileNameWithoutExtension,
   getParentDirectoryName,
   getParentDirectoryPath,
-} from './features/filepath/utils/converters';
+} from './features/FilePath/utils/Converters';
 import { getMatches } from '@tauri-apps/api/cli';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { appWindow } from '@tauri-apps/api/window';

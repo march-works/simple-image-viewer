@@ -19,7 +19,7 @@ import {
 import {
   isCompressedFile,
   isImageFile,
-} from '../../features/FilePath/utils/checkers.js';
+} from '../../features/FilePath/utils/Checkers';
 import { ImageCanvas } from '../../features/Image/routes/ImageCanvas';
 
 type Props = {

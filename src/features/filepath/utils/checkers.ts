@@ -1,5 +1,5 @@
-import { CompressedExtensions } from '../consts/compressed';
-import { ImageExtensions } from '../consts/images';
+import { CompressedExtensions } from '../consts/Compressed';
+import { ImageExtensions } from '../consts/Images';
 
 export const isCompressedFile = (filepath: string): boolean => {
   return CompressedExtensions.some((ext) => filepath.endsWith(`.${ext}`));

@@ -44,14 +44,17 @@ export const DirectoryNode: Component<Props> = (props) => {
                 .with({ type: 'File' }, (nd) => (
                   <FileNode
                     node={nd}
-                    selected={props.selected}
+                    isSelected={nd.path === props.selected?.path}
                     onClick={props.onClick}
                   />
                 ))
                 .with({ type: 'Zip' }, (nd) => (
                   <ZipNode
                     node={nd}
-                    selected={props.selected}
+                    isSelected={
+                      nd.path + nd.name ===
+                      (props.selected?.path ?? '') + (props.selected?.name ?? '')
+                    }
                     onClick={props.onClick}
                   />
                 ))
