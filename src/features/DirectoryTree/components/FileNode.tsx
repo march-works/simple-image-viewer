@@ -13,7 +13,8 @@ export const FileNode: Component<Props> = (props) => {
 
   createEffect(() => {
     props.isSelected &&
-      nodeRef && (() => {
+      nodeRef &&
+      (() => {
         console.log(nodeRef);
         nodeRef.scrollIntoView({
           behavior: 'smooth',
