@@ -1,20 +1,26 @@
+import { debounce } from '@solid-primitives/scheduled';
 import { invoke } from '@tauri-apps/api';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { FileEntry, readDir } from '@tauri-apps/api/fs';
-import { FC, useCallback, useEffect, useRef, useState } from 'react';
-import { PathSelection } from '../../features/directory-tree/routes/PathSelection';
+import {
+  Component,
+  createEffect,
+  createSignal,
+  onCleanup,
+  onMount,
+} from 'solid-js';
+import { PathSelection } from '../../features/DirectoryTree/routes/PathSelection';
 import {
   Directory,
   DirectoryTree,
   File,
   Zip,
-} from '../../features/directory-tree/types/DirectoryTree';
+} from '../../features/DirectoryTree/types/DirectoryTree';
 import {
   isCompressedFile,
   isImageFile,
-} from '../../features/filepath/utils/checkers';
-import { ImageCanvas } from '../../features/image/routes/ImageCanvas';
-import { useDebounce } from '../../hooks/useDebounce';
+} from '../../features/FilePath/utils/checkers';
+import { ImageCanvas } from '../../features/Image/routes/ImageCanvas';
 
 type Props = {
   isActiveTab: boolean;
@@ -22,17 +28,13 @@ type Props = {
   initFilePath?: string;
 };
 
-export const ViewerTab: FC<Props> = ({ isActiveTab, path, initFilePath }) => {
-  const [tree, setTree] = useState<DirectoryTree[]>([]);
-  const [currentDir, setCurrentDir] = useState<(File | Zip)[]>([]);
-  const unlistenRef = useRef<UnlistenFn>();
-  const currentDirRef = useRef<(File | Zip)[]>();
-  const isActiveTabRef = useRef<boolean>();
-  currentDirRef.current = currentDir;
-  isActiveTabRef.current = isActiveTab;
-  const [viewing, setViewing] = useState<number>(0);
-  const [selected, setSelected] = useState<File | Zip>();
-  const debouncedSelected = useDebounce(selected, 200);
+export const ViewerTab: Component<Props> = (props) => {
+  const [tree, setTree] = createSignal<DirectoryTree[]>([]);
+  const [currentDir, setCurrentDir] = createSignal<(File | Zip)[]>([]);
+  let unListenRef: UnlistenFn | undefined = undefined;
+  const [viewing, setViewing] = createSignal<number>(0);
+  const [selected, setSelected] = createSignal<File | Zip>();
+  const trigger = debounce((path: File | Zip) => setSelected(path), 100);
 
   const convertEntryToTree = (entry: FileEntry): DirectoryTree => {
     if (entry.children === null || entry.children === undefined) {
@@ -64,23 +66,23 @@ export const ViewerTab: FC<Props> = ({ isActiveTab, path, initFilePath }) => {
   };
 
   const readDirAndSetTree = async () => {
-    if (isCompressedFile(path)) {
+    if (isCompressedFile(props.path)) {
       const files = await invoke<string[]>('get_filenames_inner_zip', {
-        filepath: path,
+        filepath: props.path,
       });
-      setTree(
+      setTree(() =>
         files
           .filter((file) => isImageFile(file))
           .map((file) => {
             return {
               type: 'Zip',
               name: file,
-              path,
+              path: props.path,
             };
           })
       );
     } else {
-      const entries = await readDir(path, {
+      const entries = await readDir(props.path, {
         recursive: true,
       });
       setTree(filterNonImageFiles(entries.map(convertEntryToTree)));
@@ -89,86 +91,79 @@ export const ViewerTab: FC<Props> = ({ isActiveTab, path, initFilePath }) => {
 
   const moveForward = () => {
     setViewing((prev) =>
-      currentDirRef.current ? (prev + 1) % currentDirRef.current.length : 0
+      currentDir().length ? (prev + 1) % currentDir().length : 0
     );
   };
   const moveBackward = () => {
     setViewing((prev) =>
-      currentDirRef.current
-        ? (prev - 1 + currentDirRef.current.length) %
-          currentDirRef.current.length
+      currentDir().length
+        ? (prev - 1 + currentDir().length) % currentDir().length
         : 0
     );
   };
 
-  const handleOnKeyDown = useCallback(
-    (event: KeyboardEvent) => {
-      if (!isActiveTabRef.current) return;
-      if (event.key === 'ArrowLeft') moveBackward();
-      else if (event.key === 'ArrowRight') moveForward();
-    },
-    [isActiveTab]
-  );
+  const handleOnKeyDown = (event: KeyboardEvent) => {
+    if (!props.isActiveTab) return;
+    event.preventDefault();
+    if (event.key === 'ArrowLeft') moveBackward();
+    else if (event.key === 'ArrowRight') moveForward();
+  };
 
-  const handleOnButtonDown = useCallback(
-    (event: MouseEvent) => {
-      if (!isActiveTabRef.current) return;
-      if (event.button === 3) moveBackward();
-      else if (event.button === 4) moveForward();
-    },
-    [isActiveTab]
-  );
+  const handleOnButtonDown = (event: MouseEvent) => {
+    if (!props.isActiveTab) return;
+    event.preventDefault();
+    if (event.button === 3) moveBackward();
+    else if (event.button === 4) moveForward();
+  };
 
-  useEffect(() => {
-    invoke('subscribe_dir_notification', { filepath: path });
+  onMount(() => {
+    invoke('subscribe_dir_notification', { filepath: props.path });
     listen('directory-tree-changed', (event) => {
-      if (event.payload === path) readDirAndSetTree();
-    }).then((unlisten) => (unlistenRef.current = unlisten));
+      if (event.payload === props.path) readDirAndSetTree();
+    }).then((unListen) => (unListenRef = unListen));
 
     readDirAndSetTree();
     document.addEventListener('keydown', handleOnKeyDown, false);
     document.addEventListener('mouseup', handleOnButtonDown, false);
-    return () => {
-      unlistenRef.current && unlistenRef.current();
-      document.removeEventListener('keydown', handleOnKeyDown, false);
-      document.removeEventListener('mouseup', handleOnButtonDown, false);
-    };
-  }, []);
+  });
 
-  const extractFirstFiles = useCallback(
-    (entries: DirectoryTree[]): (File | Zip)[] => {
-      const files = entries
-        .filter((entry) => entry.type === 'File' || entry.type === 'Zip')
-        .map((entry) => entry as File | Zip);
-      if (files.length) {
-        return files;
-      }
+  onCleanup(() => {
+    unListenRef && unListenRef();
+    document.removeEventListener('keydown', handleOnKeyDown, false);
+    document.removeEventListener('mouseup', handleOnButtonDown, false);
+  });
 
-      const dirs = entries
-        .filter((entry) => entry.type === 'Directory')
-        .map((entry) => entry as Directory);
-      for (const dir of dirs) {
-        const files = extractFirstFiles(dir.children);
-        if (files.length) return files;
-      }
-      return [];
-    },
-    []
-  );
+  const extractFirstFiles = (entries: DirectoryTree[]): (File | Zip)[] => {
+    const files = entries
+      .filter((entry) => entry.type === 'File' || entry.type === 'Zip')
+      .map((entry) => entry as File | Zip);
+    if (files.length) {
+      return files;
+    }
 
-  useEffect(() => {
-    if (initFilePath) {
-      handleOnSelectedChanged(initFilePath);
+    const dirs = entries
+      .filter((entry) => entry.type === 'Directory')
+      .map((entry) => entry as Directory);
+    for (const dir of dirs) {
+      const files = extractFirstFiles(dir.children);
+      if (files.length) return files;
+    }
+    return [];
+  };
+
+  createEffect(() => {
+    if (props.initFilePath) {
+      handleOnSelectedChanged(props.initFilePath);
     } else {
-      const entry = extractFirstFiles(tree);
+      const entry = extractFirstFiles(tree());
       entry && setCurrentDir(entry);
       entry && setViewing(0);
     }
-  }, [tree, extractFirstFiles]);
+  });
 
-  useEffect(() => {
-    setSelected(currentDir[viewing]);
-  }, [currentDir, viewing]);
+  createEffect(() => {
+    trigger(currentDir()[viewing()]);
+  });
 
   const findViewingFiles = (
     path: string,
@@ -204,21 +199,21 @@ export const ViewerTab: FC<Props> = ({ isActiveTab, path, initFilePath }) => {
   };
 
   const handleOnSelectedChanged = (path: string) => {
-    const files = findViewingFiles(path, tree);
+    const files = findViewingFiles(path, tree());
     files && setCurrentDir(files.files);
     files && setViewing(files.page);
   };
 
   return (
-    <div className="flex h-full flex-row">
+    <div class="flex h-full flex-row">
       <ImageCanvas
-        viewing={debouncedSelected}
+        viewing={selected()}
         moveForward={moveForward}
         moveBackward={moveBackward}
       />
       <PathSelection
-        selected={selected}
-        tree={tree}
+        selected={currentDir()[viewing()]}
+        tree={tree()}
         onSelectedChanged={handleOnSelectedChanged}
       />
     </div>

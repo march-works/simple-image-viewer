@@ -1,4 +1,3 @@
-import { useEffect, useRef, useState } from 'react';
 import { open } from '@tauri-apps/api/dialog';
 import { Tabs } from './components/Tab/Tabs';
 import { ViewerTab } from './pages/viewer/ViewerTab';
@@ -17,6 +16,7 @@ import { getMatches } from '@tauri-apps/api/cli';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { appWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api';
+import { createSignal, onCleanup, onMount } from 'solid-js';
 
 type TabState = {
   title: string;
@@ -26,10 +26,10 @@ type TabState = {
 }[];
 
 const App = () => {
-  const [activeKey, setActiveKey] = useState<string>();
-  const [panes, setPanes] = useState<TabState>([]);
-  const newTabIndex = useRef(0);
-  const unlistenRef = useRef<UnlistenFn>();
+  const [activeKey, setActiveKey] = createSignal<string>();
+  const [panes, setPanes] = createSignal<TabState>([]);
+  let newTabIndex = 0;
+  let unListenRef: UnlistenFn | undefined = undefined;
 
   const onChange = (newActiveKey: string) => {
     setActiveKey(newActiveKey);
@@ -39,11 +39,11 @@ const App = () => {
     invoke('change_active_window');
   };
 
-  useEffect(() => {
+  onMount(() => {
     listen('image-file-opened', (event) => {
       createNewTab(event.payload as string);
       appWindow.setFocus();
-    }).then((unlisten) => (unlistenRef.current = unlisten));
+    }).then((unListen) => (unListenRef = unListen));
 
     window.addEventListener('focus', handleOnFocus, false);
     handleOnFocus();
@@ -54,14 +54,15 @@ const App = () => {
         appWindow.label === 'main' &&
         createNewTab(filepath);
     });
+  });
 
-    return () => {
-      window.removeEventListener('focus', handleOnFocus, false);
-    };
-  }, []);
+  onCleanup(() => {
+    window.removeEventListener('focus', handleOnFocus, false);
+    unListenRef && unListenRef();
+  });
 
   const createNewTab = (dir: string) => {
-    const newActiveKey = `newTab${newTabIndex.current++}`;
+    const newActiveKey = `newTab${newTabIndex++}`;
     setPanes((prevPanes) => {
       const newPanes = [...prevPanes];
       const title = isImageFile(dir)
@@ -98,14 +99,14 @@ const App = () => {
   };
 
   const remove = (targetKey: string) => {
-    let newActiveKey = activeKey;
+    let newActiveKey = activeKey();
     let lastIndex = -1;
-    panes.forEach((pane, i) => {
+    panes().forEach((pane, i) => {
       if (pane.key === targetKey) {
         lastIndex = i - 1;
       }
     });
-    const newPanes = panes.filter((pane) => pane.key !== targetKey);
+    const newPanes = panes().filter((pane) => pane.key !== targetKey);
     if (newPanes.length && newActiveKey === targetKey) {
       if (lastIndex >= 0) {
         newActiveKey = newPanes[lastIndex].key;
@@ -113,28 +114,31 @@ const App = () => {
         newActiveKey = newPanes[0].key;
       }
     }
-    setPanes(newPanes);
-    setActiveKey(newActiveKey);
+    setPanes(() => newPanes);
+    setActiveKey(() => newActiveKey);
   };
 
   return (
-    <div className="App flex h-screen w-screen select-none bg-neutral-900 text-neutral-100">
+    <div class="App flex h-screen w-screen select-none bg-neutral-900 text-neutral-100">
       <Tabs
-        viewing={activeKey}
-        tabs={panes}
+        viewing={activeKey()}
+        tabs={panes()}
         handleOnClick={onChange}
         handleOnClose={remove}
         handleOnAdd={add}
-      >
-        {panes.map((pane) => (
-          <ViewerTab
-            key={pane.key}
-            isActiveTab={pane.key === activeKey}
-            path={pane.path}
-            initFilePath={pane.initFilePath}
-          />
-        ))}
-      </Tabs>
+        contents={panes().map((pane) => {
+          return {
+            element: (
+              <ViewerTab
+                isActiveTab={pane.key === activeKey()}
+                path={pane.path}
+                initFilePath={pane.initFilePath}
+              />
+            ),
+            key: pane.key,
+          };
+        })}
+      />
     </div>
   );
 };
