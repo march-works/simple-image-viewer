@@ -53,7 +53,8 @@ export const DirectoryNode: Component<Props> = (props) => {
                     node={nd}
                     isSelected={
                       nd.path + nd.name ===
-                      (props.selected?.path ?? '') + (props.selected?.name ?? '')
+                      (props.selected?.path ?? '') +
+                        (props.selected?.name ?? '')
                     }
                     onClick={props.onClick}
                   />
