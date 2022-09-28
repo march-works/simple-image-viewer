@@ -62,7 +62,7 @@ jobs:
     - name: Install Protoc
       uses: arduino/setup-protoc@v1
     - name: install app dependencies and build it
-      run: yarn && yarn build
+      run: pnpm install && pnpm run build
     - uses: tauri-apps/tauri-action@v0
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
