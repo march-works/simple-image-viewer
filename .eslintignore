@@ -1,0 +1,4 @@
+dist/
+src-tauri/
+postcss.config.js
+tailwind.config.js

@@ -1,6 +1,4 @@
-import { faFolderOpen, faXmark } from '@fortawesome/free-solid-svg-icons';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { FC, ReactElement } from 'react';
+import { Component, For, JSX } from 'solid-js';
 
 type TabInfo = {
   key: string;
@@ -13,62 +11,66 @@ type Props = {
   handleOnClick: (key: string) => void;
   handleOnClose: (key: string) => void;
   handleOnAdd: () => void;
-  children?: ReactElement | ReactElement[];
+  contents:
+    | { element: JSX.Element; key: string }
+    | { element: JSX.Element; key: string }[];
 };
 
-export const Tabs: FC<Props> = ({
-  viewing,
-  tabs,
-  handleOnClick,
-  handleOnClose,
-  handleOnAdd,
-  children,
-}) => {
+export const Tabs: Component<Props> = (props) => {
   return (
-    <div className="relative flex w-full flex-1 flex-col">
-      <div className="flex h-8 w-full flex-none flex-row bg-neutral-800 align-baseline">
-        {tabs.map((tab) => (
-          <div
-            key={tab.key}
-            className={
-              'flex w-48 min-w-0 flex-row justify-between items-end rounded-t-md border-2 border-b-0 border-neutral-500 p-1 transition-colors' +
-              (tab.key === viewing
-                ? ' bg-gradient-to-b from-neutral-500 to-neutral-900 text-neutral-100'
-                : ' bg-neutral-900 text-neutral-400 hover:bg-gradient-to-b hover:from-neutral-600 hover:to-neutral-900 hover:text-neutral-300')
-            }
-            onMouseDown={(e) => e.button === 1 && handleOnClose(tab.key)}
-          >
+    <div class="relative flex w-full flex-1 flex-col">
+      <div class="flex h-8 w-full flex-none flex-row bg-neutral-800 align-baseline">
+        <For each={props.tabs}>
+          {(tab) => (
             <div
-              className="flex-1 self-center truncate"
-              onClick={() => handleOnClick(tab.key)}
+              class={
+                'flex w-48 min-w-0 flex-row justify-between items-end rounded-t-md border-2 border-b-0 border-neutral-500 p-1 transition-colors' +
+                (tab.key === props.viewing
+                  ? ' bg-gradient-to-b from-neutral-500 to-neutral-900 text-neutral-100'
+                  : ' bg-neutral-900 text-neutral-400 hover:bg-gradient-to-b hover:from-neutral-600 hover:to-neutral-900 hover:text-neutral-300')
+              }
+              onMouseDown={(e) =>
+                e.button === 1 && props.handleOnClose(tab.key)
+              }
             >
-              {tab.title}
+              <div
+                class="flex-1 self-center truncate"
+                onClick={() => props.handleOnClick(tab.key)}
+              >
+                {tab.title}
+              </div>
+              <div
+                class="flex pt-0.5 h-5 w-5 justify-center rounded-full text-neutral-100 transition-colors hover:bg-neutral-500"
+                onClick={() => props.handleOnClose(tab.key)}
+              >
+                <i class="fa-solid fa-xmark" />
+              </div>
             </div>
-            <div
-              className="flex pt-0.5 h-5 w-5 justify-center rounded-full text-neutral-100 transition-colors hover:bg-neutral-500"
-              onClick={() => handleOnClose(tab.key)}
-            >
-              <FontAwesomeIcon icon={faXmark} />
-            </div>
-          </div>
-        ))}
-        <div className="ml-1 flex h-8 w-8 shrink-0 flex-col items-center justify-center rounded-full border-2 border-neutral-500 bg-neutral-900 text-neutral-400 transition-colors hover:bg-neutral-700 hover:text-neutral-300">
-          <FontAwesomeIcon className='ml-0.5' icon={faFolderOpen} onClick={handleOnAdd} />
+          )}
+        </For>
+        <div class="ml-1 flex h-8 w-8 shrink-0 flex-col items-center justify-center rounded-full border-2 border-neutral-500 bg-neutral-900 text-neutral-400 transition-colors hover:bg-neutral-700 hover:text-neutral-300">
+          <i
+            class="ml-0.5 fa-solid fa-folder-open"
+            onClick={() => props.handleOnAdd()}
+          />
         </div>
       </div>
-      <div className="relative" style={{ height: 'calc(100% - 2rem)' }}>
-        {Array.isArray(children)
-          ? children.map((child) => (
+      <div class="relative" style={{ height: 'calc(100% - 2rem)' }}>
+        {Array.isArray(props.contents) ? (
+          <For each={props.contents}>
+            {(child) => (
               <div
-                key={child.key}
-                className={`w-full h-full${
-                  child.key === viewing ? '' : ' hidden'
+                class={`w-full h-full${
+                  child?.key === props.viewing ? '' : ' hidden'
                 }`}
               >
-                {child}
+                {child.element}
               </div>
-            ))
-          : children}
+            )}
+          </For>
+        ) : (
+          props.contents.element
+        )}
       </div>
     </div>
   );
