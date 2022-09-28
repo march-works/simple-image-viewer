@@ -34,8 +34,10 @@ export const DirectoryList: Component<Props> = (props) => {
             .with({ type: 'Zip' }, (nd) => (
               <ZipNode
                 node={nd}
-                isSelected={nd.path + nd.name ===
-                  (props.selected?.path ?? '') + (props.selected?.name ?? '')}
+                isSelected={
+                  nd.path + nd.name ===
+                  (props.selected?.path ?? '') + (props.selected?.name ?? '')
+                }
                 onClick={props.onClick}
               />
             ))
