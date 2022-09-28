@@ -1,10 +1,7 @@
-import { faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { invoke } from '@tauri-apps/api/tauri';
-import { FC, useCallback, useEffect, useState } from 'react';
-import { Puff } from 'react-loader-spinner';
+import { Component, createEffect, createSignal } from 'solid-js';
 import { match } from 'ts-pattern';
-import { File, Zip } from '../../directory-tree/types/DirectoryTree';
+import { File, Zip } from '../../DirectoryTree/types/DirectoryTree';
 
 type Props = {
   viewing?: File | Zip;
@@ -12,72 +9,55 @@ type Props = {
   moveBackward: () => void;
 };
 
-export const ImageCanvas: FC<Props> = ({
-  viewing,
-  moveForward,
-  moveBackward,
-}) => {
-  const [data, setData] = useState<string>('');
-  const [loading, setLoading] = useState<boolean>(true);
+export const ImageCanvas: Component<Props> = (props) => {
+  const [data, setData] = createSignal<string>('');
 
-  const convertPathToData = useCallback(async (file: File) => {
+  const convertPathToData = async (file: File) => {
     if (file.path === '') return '';
     return invoke<string>('open_file_image', { filepath: file.path });
-  }, []);
+  };
 
-  const readImageInZip = useCallback(async (file: Zip) => {
+  const readImageInZip = async (file: Zip) => {
     return invoke<string>('read_image_in_zip', {
       path: file.path,
       filename: file.name,
     });
-  }, []);
+  };
 
-  useEffect(() => {
-    setLoading(true);
-    match(viewing)
+  createEffect(() => {
+    match(props.viewing)
       .with({ type: 'File' }, (file) =>
         convertPathToData(file).then((converted) => {
           setData(converted);
-          setLoading(false);
         })
       )
       .with({ type: 'Zip' }, (file) =>
         readImageInZip(file).then((binary) => {
           setData(binary);
-          setLoading(false);
         })
       )
       .with(undefined, () => {
         // do nothing
       })
       .exhaustive();
-  }, [convertPathToData, viewing]);
+  });
 
   return (
-    <div className="flex flex-row content-center" style={{ flex: 4 }}>
+    <div class="flex flex-row content-center" style={{ flex: 4 }}>
       <div
-        className="flex cursor-pointer items-center opacity-50 transition-colors hover:bg-neutral-800 hover:opacity-100"
-        onClick={moveBackward}
+        class="flex cursor-pointer items-center opacity-50 transition-colors hover:bg-neutral-800 hover:opacity-100"
+        onClick={() => props.moveBackward()}
       >
-        <FontAwesomeIcon className="p-2 text-4xl" icon={faChevronLeft} />
+        <i class="fa-solid fa-chevron-left p-2 text-4xl" />
       </div>
-      <div className="relative flex flex-1 content-center justify-center">
-        <Puff
-          visible={loading}
-          width={30}
-          wrapperClass="absolute bottom-1 right-1"
-          color="#FFFFFF"
-        />
-        <img
-          className="object-contain"
-          src={`data:image/jpeg;base64,${data}`}
-        />
+      <div class="relative flex flex-1 content-center justify-center">
+        <img class="object-contain" src={`data:image/jpeg;base64,${data()}`} />
       </div>
       <div
-        className="flex cursor-pointer items-center opacity-50 transition-colors hover:bg-neutral-800 hover:opacity-100"
-        onClick={moveForward}
+        class="flex cursor-pointer items-center opacity-50 transition-colors hover:bg-neutral-800 hover:opacity-100"
+        onClick={() => props.moveForward()}
       >
-        <FontAwesomeIcon className="p-2 text-4xl" icon={faChevronRight} />
+        <i class="fa-solid fa-chevron-right p-2 text-4xl" />
       </div>
     </div>
   );
