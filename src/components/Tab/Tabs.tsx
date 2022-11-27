@@ -1,22 +1,20 @@
-import { Component, For, JSX } from 'solid-js';
+import { For, JSX } from 'solid-js';
 
-type TabInfo = {
+type TabInfo<T> = T & {
   key: string;
   title: string;
 };
 
-type Props = {
+type Props<T> = {
   viewing?: string;
-  tabs: TabInfo[];
+  tabs: TabInfo<T>[];
+  intoContent: (info: TabInfo<T>) => JSX.Element;
   handleOnClick: (key: string) => void;
   handleOnClose: (key: string) => void;
   handleOnAdd: () => void;
-  contents:
-    | { element: JSX.Element; key: string }
-    | { element: JSX.Element; key: string }[];
 };
 
-export const Tabs: Component<Props> = (props) => {
+export const Tabs = <T,>(props: Props<T>) => {
   return (
     <div class="relative flex w-full flex-1 flex-col">
       <div class="flex h-8 w-full flex-none flex-row bg-neutral-800 align-baseline">
@@ -56,21 +54,17 @@ export const Tabs: Component<Props> = (props) => {
         </div>
       </div>
       <div class="relative" style={{ height: 'calc(100% - 2rem)' }}>
-        {Array.isArray(props.contents) ? (
-          <For each={props.contents}>
-            {(child) => (
-              <div
-                class={`w-full h-full${
-                  child?.key === props.viewing ? '' : ' hidden'
-                }`}
-              >
-                {child.element}
-              </div>
-            )}
-          </For>
-        ) : (
-          props.contents.element
-        )}
+        <For each={props.tabs}>
+          {(tab) => (
+            <div
+              class={`w-full h-full${
+                tab?.key === props.viewing ? '' : ' hidden'
+              }`}
+            >
+              {props.intoContent(tab)}
+            </div>
+          )}
+        </For>
       </div>
     </div>
   );
