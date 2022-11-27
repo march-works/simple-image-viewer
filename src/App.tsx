@@ -123,21 +123,16 @@ const App = () => {
       <Tabs
         viewing={activeKey()}
         tabs={panes()}
+        intoContent={(info) => (
+          <ViewerTab
+            isActiveTab={info.key === activeKey()}
+            path={info.path}
+            initFilePath={info.initFilePath}
+          />
+        )}
         handleOnClick={onChange}
         handleOnClose={remove}
         handleOnAdd={add}
-        contents={panes().map((pane) => {
-          return {
-            element: (
-              <ViewerTab
-                isActiveTab={pane.key === activeKey()}
-                path={pane.path}
-                initFilePath={pane.initFilePath}
-              />
-            ),
-            key: pane.key,
-          };
-        })}
       />
     </div>
   );
