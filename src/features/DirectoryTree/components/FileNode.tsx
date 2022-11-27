@@ -15,7 +15,6 @@ export const FileNode: Component<Props> = (props) => {
     props.isSelected &&
       nodeRef &&
       (() => {
-        console.log(nodeRef);
         nodeRef.scrollIntoView({
           behavior: 'smooth',
           block: 'center',
