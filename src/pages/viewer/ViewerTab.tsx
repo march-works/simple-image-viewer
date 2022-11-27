@@ -48,7 +48,15 @@ export const ViewerTab: Component<Props> = (props) => {
       type: 'Directory',
       name: entry.name ?? '',
       path: entry.path,
-      children: entry.children.map(convertEntryToTree),
+      children: entry.children
+        .map(convertEntryToTree)
+        .sort((a, b) =>
+          a.name.localeCompare(
+            b.name,
+            navigator.languages[0] || navigator.language,
+            { numeric: true, ignorePunctuation: true }
+          )
+        ),
     };
   };
 
@@ -73,6 +81,12 @@ export const ViewerTab: Component<Props> = (props) => {
       setTree(() =>
         files
           .filter((file) => isImageFile(file))
+          .sort((a, b) =>
+            a.localeCompare(b, navigator.languages[0] || navigator.language, {
+              numeric: true,
+              ignorePunctuation: true,
+            })
+          )
           .map((file) => {
             return {
               type: 'Zip',
