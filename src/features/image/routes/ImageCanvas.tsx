@@ -7,6 +7,9 @@ type Props = {
   viewing?: File | Zip;
   moveForward: () => void;
   moveBackward: () => void;
+  zoomIn: () => void;
+  zoomOut: () => void;
+  imageScale: number;
 };
 
 export const ImageCanvas: Component<Props> = (props) => {
@@ -50,14 +53,26 @@ export const ImageCanvas: Component<Props> = (props) => {
       >
         <i class="fa-solid fa-chevron-left p-2 text-4xl" />
       </div>
-      <div class="relative flex flex-1 content-center justify-center">
-        <img class="object-contain" src={`data:image/jpeg;base64,${data()}`} />
+      <div class="max-w-full max-h-full object-cover object-center relative flex flex-1 content-center justify-center overflow-hidden">
+        <img class="object-contain" src={`data:image/jpeg;base64,${data()}`} style={{ transform: `scale(${props.imageScale})` }}/>
       </div>
       <div
         class="flex cursor-pointer items-center opacity-50 transition-colors hover:bg-neutral-800 hover:opacity-100"
         onClick={() => props.moveForward()}
       >
         <i class="fa-solid fa-chevron-right p-2 text-4xl" />
+      </div>
+      <div
+        class="w-20 h-20 flex cursor-pointer items-center opacity-50 transition-colors hover:bg-neutral-800 hover:opacity-100"
+        onClick={() => props.zoomIn()}
+      >
+          <i class="fa-solid fa-regular fa-magnifying-glass-plus p-2 text-4xl" />
+      </div>
+      <div
+        class="w-20 h-20 flex cursor-pointer items-center opacity-50 transition-colors hover:bg-neutral-800 hover:opacity-100"
+        onClick={() => props.zoomOut()}
+      >
+        <i class="fa-solid fa-regular fa-magnifying-glass-minus p-2 text-4xl" />
       </div>
     </div>
   );
