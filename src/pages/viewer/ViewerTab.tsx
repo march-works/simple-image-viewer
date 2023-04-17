@@ -35,6 +35,7 @@ export const ViewerTab: Component<Props> = (props) => {
   const [viewing, setViewing] = createSignal<number>(0);
   const [selected, setSelected] = createSignal<File | Zip>();
   const trigger = debounce((path: File | Zip) => setSelected(path), 100);
+  const [imageScale, setImageScale] = createSignal<number>(1);
 
   const convertEntryToTree = (entry: FileEntry): DirectoryTree => {
     if (entry.children === null || entry.children === undefined) {
@@ -113,6 +114,16 @@ export const ViewerTab: Component<Props> = (props) => {
       currentDir().length
         ? (prev - 1 + currentDir().length) % currentDir().length
         : 0
+    );
+  };
+  const zoomIn = () => {
+    setImageScale((prev) =>
+      prev = prev >= 1.5 ? 1.5 : prev + 0.1
+    );
+  };
+  const zoomOut = () => {
+    setImageScale((prev) =>
+      prev = prev < 0.4 ? 0.3 : prev - 0.1
     );
   };
 
@@ -224,6 +235,9 @@ export const ViewerTab: Component<Props> = (props) => {
         viewing={selected()}
         moveForward={moveForward}
         moveBackward={moveBackward}
+        zoomIn={zoomIn}
+        zoomOut={zoomOut}
+        imageScale={imageScale()}
       />
       <PathSelection
         selected={currentDir()[viewing()]}
