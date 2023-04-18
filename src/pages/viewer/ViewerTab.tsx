@@ -36,6 +36,28 @@ export const ViewerTab: Component<Props> = (props) => {
   const [selected, setSelected] = createSignal<File | Zip>();
   const trigger = debounce((path: File | Zip) => setSelected(path), 100);
   const [imageScale, setImageScale] = createSignal<number>(1);
+  const [isDragging, setIsDragging] = createSignal(false);
+  const [initialPosition, setInitialPosition] = createSignal({ x: 0, y: 0 });
+  const [position, setPosition] = createSignal({ x: 0, y: 0 });
+
+  const handleMouseDown = (e: MouseEvent) => {
+    e.preventDefault();
+    setIsDragging(true);    
+    setInitialPosition({ x: e.clientX, y: e.clientY });
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseMove = (e: MouseEvent) => {    
+    if (isDragging()) {
+      const dx = e.clientX - initialPosition().x;
+      const dy = e.clientY - initialPosition().y;
+      setPosition({ x: position().x + dx, y: position().y + dy });
+      setInitialPosition({ x: e.clientX, y: e.clientY });
+    }
+  };
 
   const convertEntryToTree = (entry: FileEntry): DirectoryTree => {
     if (entry.children === null || entry.children === undefined) {
@@ -117,14 +139,10 @@ export const ViewerTab: Component<Props> = (props) => {
     );
   };
   const zoomIn = () => {
-    setImageScale((prev) =>
-      prev = prev >= 1.5 ? 1.5 : prev + 0.1
-    );
+    setImageScale((prev) => (prev = prev >= 1.5 ? 1.5 : prev + 0.1));
   };
   const zoomOut = () => {
-    setImageScale((prev) =>
-      prev = prev < 0.4 ? 0.3 : prev - 0.1
-    );
+    setImageScale((prev) => (prev = prev < 0.4 ? 0.3 : prev - 0.1));
   };
 
   const handleOnKeyDown = (event: KeyboardEvent) => {
@@ -238,6 +256,10 @@ export const ViewerTab: Component<Props> = (props) => {
         zoomIn={zoomIn}
         zoomOut={zoomOut}
         imageScale={imageScale()}
+        handleMouseUp={handleMouseUp}
+        handleMouseDown={handleMouseDown}
+        handleMouseMove={handleMouseMove}
+        position={position()}
       />
       <PathSelection
         selected={currentDir()[viewing()]}
