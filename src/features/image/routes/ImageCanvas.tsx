@@ -14,6 +14,7 @@ type Props = {
   handleMouseDown: (e: MouseEvent) => void;
   handleMouseMove: (e: MouseEvent) => void; 
   position: { x: number; y: number };
+  handleWheel: (e: WheelEvent) => void;
 };
 
 export const ImageCanvas: Component<Props> = (props) => {
@@ -60,7 +61,8 @@ export const ImageCanvas: Component<Props> = (props) => {
       <div class="max-w-full max-h-full object-cover object-center relative flex flex-1 content-center justify-center overflow-hidden"
           onMouseDown={props.handleMouseDown}
           onMouseUp={props.handleMouseUp}
-          onMouseMove={props.handleMouseMove}>
+          onMouseMove={props.handleMouseMove}
+          onWheel={props.handleWheel}>
         <img
           class="object-contain"
           src={`data:image/jpeg;base64,${data()}`}
