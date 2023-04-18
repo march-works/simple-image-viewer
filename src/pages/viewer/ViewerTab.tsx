@@ -138,11 +138,15 @@ export const ViewerTab: Component<Props> = (props) => {
         : 0
     );
   };
+  const handleWheel = (e: WheelEvent) => {
+    e.preventDefault();
+    setImageScale((prev) => Math.min(Math.max(0.1, prev + (e.deltaY > 0 ? -0.1 : 0.1)), 3));
+  }
   const zoomIn = () => {
-    setImageScale((prev) => (prev = prev >= 1.5 ? 1.5 : prev + 0.1));
+    setImageScale((prev) => Math.min(Math.max(0.1, prev + 0.1), 3));
   };
   const zoomOut = () => {
-    setImageScale((prev) => (prev = prev < 0.4 ? 0.3 : prev - 0.1));
+    setImageScale((prev) => Math.min(Math.max(0.1, prev - 0.1), 3));
   };
 
   const handleOnKeyDown = (event: KeyboardEvent) => {
@@ -260,6 +264,7 @@ export const ViewerTab: Component<Props> = (props) => {
         handleMouseDown={handleMouseDown}
         handleMouseMove={handleMouseMove}
         position={position()}
+        handleWheel={handleWheel}
       />
       <PathSelection
         selected={currentDir()[viewing()]}
