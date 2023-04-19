@@ -50,7 +50,7 @@ export const ViewerTab: Component<Props> = (props) => {
     setIsDragging(false);
   };
 
-  const handleMouseMove = (e: MouseEvent) => {    
+  const handleMouseMove = (e: MouseEvent) => {
     if (isDragging()) {
       const dx = e.clientX - initialPosition().x;
       const dy = e.clientY - initialPosition().y;
@@ -148,12 +148,13 @@ export const ViewerTab: Component<Props> = (props) => {
   const zoomOut = () => {
     setImageScale((prev) => Math.min(Math.max(0.1, prev - 0.1), 3));
   };
-
   const handleOnKeyDown = (event: KeyboardEvent) => {
     if (!props.isActiveTab) return;
     event.preventDefault();
     if (event.key === 'ArrowLeft') moveBackward();
     else if (event.key === 'ArrowRight') moveForward();
+    else if (event.ctrlKey && event.key === "i") zoomIn();
+    else if (event.ctrlKey && event.key === "o") zoomOut();
   };
 
   const handleOnButtonDown = (event: MouseEvent) => {
