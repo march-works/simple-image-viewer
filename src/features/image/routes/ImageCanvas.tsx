@@ -64,7 +64,7 @@ export const ImageCanvas: Component<Props> = (props) => {
           onMouseMove={props.handleMouseMove}
           onWheel={props.handleWheel}>
         <img
-          class="object-contain"
+          class="absolute inset-0 mx-auto my-auto object-contain"
           src={`data:image/jpeg;base64,${data()}`}
           style={{
             transform: `scale(${props.imageScale}) translate(${props.position.x}px, ${props.position.y}px)`,
