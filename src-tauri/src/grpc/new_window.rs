@@ -33,7 +33,6 @@ impl NewWindowOpened for Opener {
             format!("label-{}", self.count.lock().await),
             tauri::WindowUrl::App("index.html".into()),
         )
-        .focus()
         .title("Simple Image Viewer")
         .maximized(true)
         .build()
