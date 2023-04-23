@@ -54,7 +54,12 @@
       "csp": null
     },
     "updater": {
-      "active": false
+      "active": true,
+      "endpoints": [
+        "https://gist.githubusercontent.com/march101348/e7c9399157590f0fb28882ff7cbe31dd/raw"
+      ],
+      "dialog": true,
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDI1OERERDk5MUQxQ0IwNTEKUldSUnNCd2RtZDJOSmJoclpqOXZTVERQQ20vakNFNUNBNGppWWUrbmhyVGhrekhna0NUaWl2R2sK"
     },
     "windows": [
       {
