@@ -10,15 +10,15 @@ type Props = {
   zoomIn: () => void;
   zoomOut: () => void;
   imageScale: number;
-  handleMouseUp: (e: MouseEvent) => void;
-  handleMouseDown: (e: MouseEvent) => void;
-  handleMouseMove: (e: MouseEvent) => void;
   position: { x: number; y: number };
+  onPositionChange: (position: { x: number; y: number }) => void;
   handleWheel: (e: WheelEvent) => void;
 };
 
 export const ImageCanvas: Component<Props> = (props) => {
   const [data, setData] = createSignal<string>('');
+  const [isDragging, setIsDragging] = createSignal(false);
+  const [initialPosition, setInitialPosition] = createSignal({ x: 0, y: 0 });
 
   const convertPathToData = async (file: File) => {
     if (file.path === '') return '';
@@ -30,6 +30,29 @@ export const ImageCanvas: Component<Props> = (props) => {
       path: file.path,
       filename: file.name,
     });
+  };
+  const handleMouseDown = (event: MouseEvent) => {
+    event.preventDefault();
+    if (event.button === 0) {
+      setIsDragging(true);
+      setInitialPosition({ x: event.clientX, y: event.clientY });
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseMove = (event: MouseEvent) => {
+    if (isDragging()) {
+      const dx = event.clientX - initialPosition().x;
+      const dy = event.clientY - initialPosition().y;
+      props.onPositionChange({
+        x: props.position.x + dx,
+        y: props.position.y + dy,
+      });
+      setInitialPosition({ x: event.clientX, y: event.clientY });
+    }
   };
 
   createEffect(() => {
@@ -61,10 +84,11 @@ export const ImageCanvas: Component<Props> = (props) => {
       <div class="relative flex content-center" style={{ flex: 2 }}>
         <div
           class="max-w-full max-h-full object-cover object-center relative flex flex-1 content-center justify-center overflow-hidden"
-          onMouseDown={props.handleMouseDown}
-          onMouseUp={props.handleMouseUp}
-          onMouseMove={props.handleMouseMove}
-          onWheel={props.handleWheel}>
+          onMouseDown={handleMouseDown}
+          onMouseUp={handleMouseUp}
+          onMouseMove={handleMouseMove}
+          onWheel={props.handleWheel}
+        >
           <img
             class="absolute inset-0 m-auto object-contain"
             src={`data:image/jpeg;base64,${data()}`}
@@ -78,13 +102,15 @@ export const ImageCanvas: Component<Props> = (props) => {
         </div>
         <div class="absolute fixed bottom-0 left-0 w-full flex justify-center items-end">
           <button
-            class="w-20 h-20 flex cursor-pointer opacity-50 transition-colors hover:bg-neutral-800 hover:opacity-100 items-center justify-center"
-            onClick={() => props.zoomIn()}>
+            class="w-20 h-20 flex cursor-pointer opacity-50 transition-colors hover:opacity-100 items-center justify-center"
+            onClick={() => props.zoomIn()}
+          >
             <i class="fa-solid fa-regular fa-magnifying-glass-plus p-2 text-4xl" />
           </button>
           <button
-            class="w-20 h-20 flex cursor-pointer opacity-50 transition-colors hover:bg-neutral-800 hover:opacity-100 items-center justify-center"
-            onClick={() => props.zoomOut()}>
+            class="w-20 h-20 flex cursor-pointer opacity-50 transition-colors hover:opacity-100 items-center justify-center"
+            onClick={() => props.zoomOut()}
+          >
             <i class=" fa-regular fa-magnifying-glass-minus p-2 text-4xl" />
           </button>
         </div>
