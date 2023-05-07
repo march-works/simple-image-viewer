@@ -90,7 +90,7 @@ export const ImageCanvas: Component<Props> = (props) => {
           onWheel={props.handleWheel}
         >
           <img
-            class="absolute inset-0 m-auto object-contain"
+            class="w-full h-full object-contain"
             src={`data:image/jpeg;base64,${data()}`}
             style={{
               transform: `scale(${props.imageScale}) translate(${props.position.x}px, ${props.position.y}px)`,
