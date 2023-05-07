@@ -36,28 +36,7 @@ export const ViewerTab: Component<Props> = (props) => {
   const [selected, setSelected] = createSignal<File | Zip>();
   const trigger = debounce((path: File | Zip) => setSelected(path), 100);
   const [imageScale, setImageScale] = createSignal<number>(1);
-  const [isDragging, setIsDragging] = createSignal(false);
-  const [initialPosition, setInitialPosition] = createSignal({ x: 0, y: 0 });
   const [position, setPosition] = createSignal({ x: 0, y: 0 });
-
-  const handleMouseDown = (e: MouseEvent) => {
-    e.preventDefault();
-    setIsDragging(true);    
-    setInitialPosition({ x: e.clientX, y: e.clientY });
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
-
-  const handleMouseMove = (e: MouseEvent) => {
-    if (isDragging()) {
-      const dx = e.clientX - initialPosition().x;
-      const dy = e.clientY - initialPosition().y;
-      setPosition({ x: position().x + dx, y: position().y + dy });
-      setInitialPosition({ x: e.clientX, y: e.clientY });
-    }
-  };
 
   const convertEntryToTree = (entry: FileEntry): DirectoryTree => {
     if (entry.children === null || entry.children === undefined) {
@@ -130,31 +109,40 @@ export const ViewerTab: Component<Props> = (props) => {
     setViewing((prev) =>
       currentDir().length ? (prev + 1) % currentDir().length : 0
     );
+    resetStatus();
   };
+
   const moveBackward = () => {
     setViewing((prev) =>
       currentDir().length
         ? (prev - 1 + currentDir().length) % currentDir().length
         : 0
     );
+    resetStatus();
   };
+
   const handleWheel = (e: WheelEvent) => {
     e.preventDefault();
-    setImageScale((prev) => Math.min(Math.max(0.1, prev + (e.deltaY > 0 ? -0.1 : 0.1)), 3));
-  }
+    setImageScale((prev) =>
+      Math.min(Math.max(0.1, prev + (e.deltaY > 0 ? -0.1 : 0.1)), 3)
+    );
+  };
+
   const zoomIn = () => {
     setImageScale((prev) => Math.min(Math.max(0.1, prev + 0.1), 3));
   };
+
   const zoomOut = () => {
     setImageScale((prev) => Math.min(Math.max(0.1, prev - 0.1), 3));
   };
+
   const handleOnKeyDown = (event: KeyboardEvent) => {
     if (!props.isActiveTab) return;
     event.preventDefault();
     if (event.key === 'ArrowLeft') moveBackward();
     else if (event.key === 'ArrowRight') moveForward();
-    else if (event.ctrlKey && event.key === "i") zoomIn();
-    else if (event.ctrlKey && event.key === "o") zoomOut();
+    else if (event.ctrlKey && event.key === 'i') zoomIn();
+    else if (event.ctrlKey && event.key === 'o') zoomOut();
   };
 
   const handleOnButtonDown = (event: MouseEvent) => {
@@ -162,6 +150,15 @@ export const ViewerTab: Component<Props> = (props) => {
     event.preventDefault();
     if (event.button === 3) moveBackward();
     else if (event.button === 4) moveForward();
+  };
+
+  const handlePositionChange = (newPosition: { x: number; y: number }) => {
+    setPosition(newPosition);
+  };
+
+  const resetStatus = () => {
+    setImageScale(1);
+    setPosition({ x: 0, y: 0 });
   };
 
   onMount(() => {
@@ -250,6 +247,7 @@ export const ViewerTab: Component<Props> = (props) => {
     const files = findViewingFiles(path, tree());
     files && setCurrentDir(files.files);
     files && setViewing(files.page);
+    resetStatus();
   };
 
   return (
@@ -261,10 +259,8 @@ export const ViewerTab: Component<Props> = (props) => {
         zoomIn={zoomIn}
         zoomOut={zoomOut}
         imageScale={imageScale()}
-        handleMouseUp={handleMouseUp}
-        handleMouseDown={handleMouseDown}
-        handleMouseMove={handleMouseMove}
         position={position()}
+        onPositionChange={handlePositionChange}
         handleWheel={handleWheel}
       />
       <PathSelection
