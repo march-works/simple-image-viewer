@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/tauri';
 import { Component, createEffect, createSignal } from 'solid-js';
 import { match } from 'ts-pattern';
 import { File, Zip } from '../../DirectoryTree/types/DirectoryTree';
-import { HiSolidChevronLeft, HiSolidChevronRight } from 'solid-icons/hi'
+import { HiSolidChevronLeft, HiSolidChevronRight } from 'solid-icons/hi';
 
 type Props = {
   viewing?: File | Zip;
@@ -49,7 +49,7 @@ export const ImageCanvas: Component<Props> = (props) => {
         class="flex cursor-pointer items-center opacity-50 transition-colors hover:bg-neutral-800 hover:opacity-100"
         onClick={() => props.moveBackward()}
       >
-        <HiSolidChevronLeft class="text-6xl"/>
+        <HiSolidChevronLeft class="text-6xl" />
       </div>
       <div class="relative flex flex-1 content-center justify-center">
         <img class="object-contain" src={`data:image/jpeg;base64,${data()}`} />
@@ -58,7 +58,7 @@ export const ImageCanvas: Component<Props> = (props) => {
         class="flex cursor-pointer items-center opacity-50 transition-colors hover:bg-neutral-800 hover:opacity-100"
         onClick={() => props.moveForward()}
       >
-        <HiSolidChevronRight class="text-6xl"/>
+        <HiSolidChevronRight class="text-6xl" />
       </div>
     </div>
   );

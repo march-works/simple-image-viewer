@@ -1,4 +1,4 @@
-import { DirectoryTree, File, Zip } from "../types/DirectoryTree";
+import { DirectoryTree, File, Zip } from '../types/DirectoryTree';
 
 export const findViewingFiles = (
   path: string,

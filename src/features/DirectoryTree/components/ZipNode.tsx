@@ -1,7 +1,7 @@
 import { Component, createEffect } from 'solid-js';
 import { Zip } from '../types/DirectoryTree';
 import { NodeBaseStyle } from './NodeBaseStyle';
-import { FaSolidImage } from 'solid-icons/fa'
+import { FaSolidImage } from 'solid-icons/fa';
 
 type Props = {
   node: Zip;
