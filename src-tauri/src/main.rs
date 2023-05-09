@@ -5,7 +5,7 @@
 
 #[tokio::main]
 async fn main() {
-    app::app::viewer::open_new_viewer()
+    app::app::open_new_viewer()
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

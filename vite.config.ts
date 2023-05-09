@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import solidPlugin from 'vite-plugin-solid';
+import { resolve } from "path";
 
 export default defineConfig({
   plugins: [solidPlugin()],
@@ -22,5 +23,11 @@ export default defineConfig({
     minify: !process.env.TAURI_DEBUG ? 'esbuild' : false,
     // produce sourcemaps for debug builds
     sourcemap: !!process.env.TAURI_DEBUG,
+    rollupOptions: {
+      input: {
+        index: resolve(__dirname, "index.html"),
+        config: resolve(__dirname, "explorer.html"),
+      },
+    },
   },
 });
