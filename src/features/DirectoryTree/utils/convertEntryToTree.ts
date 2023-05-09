@@ -1,5 +1,5 @@
-import { FileEntry } from "@tauri-apps/api/fs";
-import { DirectoryTree } from "../types/DirectoryTree";
+import { FileEntry } from '@tauri-apps/api/fs';
+import { DirectoryTree } from '../types/DirectoryTree';
 
 export const convertEntryToTree = (entry: FileEntry): DirectoryTree => {
   if (entry.children === null || entry.children === undefined) {

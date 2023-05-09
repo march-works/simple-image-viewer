@@ -1,4 +1,4 @@
-import { Directory, DirectoryTree, File, Zip } from "../types/DirectoryTree";
+import { Directory, DirectoryTree, File, Zip } from '../types/DirectoryTree';
 
 export const extractFirstFiles = (entries: DirectoryTree[]): (File | Zip)[] => {
   const files = entries

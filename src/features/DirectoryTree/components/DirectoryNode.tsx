@@ -4,7 +4,12 @@ import { Directory, DirectoryTree } from '../types/DirectoryTree';
 import { FileNode } from './FileNode';
 import { NodeBaseStyle } from './NodeBaseStyle';
 import { ZipNode } from './ZipNode';
-import { FaSolidCaretRight, FaSolidCaretDown, FaSolidFolderOpen, FaSolidFolder } from 'solid-icons/fa'
+import {
+  FaSolidCaretRight,
+  FaSolidCaretDown,
+  FaSolidFolderOpen,
+  FaSolidFolder,
+} from 'solid-icons/fa';
 
 type Props = {
   tree: Directory;

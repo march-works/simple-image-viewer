@@ -1,5 +1,5 @@
-import { isImageFile } from "../../filepath/utils/checkers";
-import { DirectoryTree } from "../types/DirectoryTree";
+import { isImageFile } from '../../filepath/utils/checkers';
+import { DirectoryTree } from '../types/DirectoryTree';
 
 export const filterNonImageFiles = (tree: DirectoryTree[]): DirectoryTree[] => {
   return tree

@@ -1,5 +1,9 @@
 import { For, JSX } from 'solid-js';
-import { FaSolidXmark, FaSolidFolderOpen, FaSolidRectangleList } from 'solid-icons/fa'
+import {
+  FaSolidXmark,
+  FaSolidFolderOpen,
+  FaSolidRectangleList,
+} from 'solid-icons/fa';
 
 type TabInfo<T> = T & {
   key: string;
