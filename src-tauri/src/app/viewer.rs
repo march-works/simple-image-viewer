@@ -1,14 +1,10 @@
 use std::{io::Read, path::Path, sync::Mutex};
-
+use base64::{engine::general_purpose, Engine as _};
 use notify::{recommended_watcher, RecursiveMode, Watcher};
-use serde_json::Value;
-use sysinfo::{ProcessExt, System, SystemExt};
-use tauri::{utils::platform::current_exe, Builder, Manager, State, Window, Wry};
-
-use crate::grpc::{add_tab, new_window, server};
+use tauri::{State, Window};
 
 #[tauri::command]
-fn subscribe_dir_notification(filepath: String, window: Window) {
+pub(crate) fn subscribe_dir_notification(filepath: String, window: Window) {
     let path_inner = filepath.clone();
     recommended_watcher(move |res| match res {
         Ok(_) => {
@@ -36,13 +32,13 @@ fn subscribe_dir_notification(filepath: String, window: Window) {
 }
 
 #[tauri::command]
-fn open_file_image(filepath: String) -> String {
+pub(crate) fn open_file_image(filepath: String) -> String {
     let img = std::fs::read(filepath).unwrap_or_default();
-    base64::encode(&img)
+    general_purpose::STANDARD_NO_PAD.encode(img)
 }
 
 #[tauri::command]
-fn get_filenames_inner_zip(filepath: String) -> Vec<String> {
+pub(crate) fn get_filenames_inner_zip(filepath: String) -> Vec<String> {
     let file = std::fs::read(filepath).unwrap_or_default();
     let zip = zip::ZipArchive::new(std::io::Cursor::new(file));
     let mut files = zip
@@ -53,7 +49,7 @@ fn get_filenames_inner_zip(filepath: String) -> Vec<String> {
 }
 
 #[tauri::command]
-fn read_image_in_zip(path: String, filename: String) -> String {
+pub(crate) fn read_image_in_zip(path: String, filename: String) -> String {
     let file = std::fs::read(path).unwrap_or_default();
     let zip = zip::ZipArchive::new(std::io::Cursor::new(file));
     match zip {
@@ -63,7 +59,7 @@ fn read_image_in_zip(path: String, filename: String) -> String {
                 Ok(mut f) => {
                     let mut buf = vec![];
                     f.read_to_end(&mut buf).unwrap_or_default();
-                    base64::encode(&buf)
+                    general_purpose::STANDARD_NO_PAD.encode(&buf)
                 }
                 Err(_) => "".into(),
             }
@@ -77,74 +73,9 @@ pub struct ActiveWindow {
 }
 
 #[tauri::command]
-fn change_active_window(window: Window, active: State<ActiveWindow>) {
+pub(crate) fn change_active_window(window: Window, active: State<ActiveWindow>) {
     match active.label.lock() {
         Ok(mut label) => *label = window.label().to_string(),
         Err(_) => (),
     }
-}
-
-fn get_running_count() -> i32 {
-    let app_exe = current_exe()
-        .unwrap_or_default()
-        .file_name()
-        .unwrap_or_default()
-        .to_str()
-        .unwrap_or_default()
-        .to_string();
-    let mut cnt = 0;
-    System::new_all()
-        .processes()
-        .into_iter()
-        .for_each(|(_, process)| {
-            if app_exe
-                == process
-                    .exe()
-                    .file_name()
-                    .unwrap_or_default()
-                    .to_str()
-                    .unwrap_or_default()
-                    .to_string()
-            {
-                cnt += 1;
-            }
-        });
-    cnt
-}
-
-pub fn open_new_viewer() -> Builder<Wry> {
-    tauri::Builder::default()
-        .setup(|app| {
-            // when other process already running
-            if get_running_count() > 1 {
-                match app.get_cli_matches() {
-                    Ok(matches) => match &matches.args.get("filepath").map(|v| v.value.clone()) {
-                        Some(Value::String(val)) => {
-                            // when executed with file path
-                            tokio::spawn(add_tab::transfer(val.to_string(), app.app_handle()));
-                        }
-                        _ => {
-                            // when executed without file path
-                            tokio::spawn(new_window::open(app.app_handle()));
-                        }
-                    },
-                    Err(_) => {
-                        app.app_handle().exit(0);
-                    }
-                }
-            } else {
-                tokio::spawn(server::run_server(app.app_handle()));
-            }
-            Ok(())
-        })
-        .manage(ActiveWindow {
-            label: Mutex::new("main".to_string()),
-        })
-        .invoke_handler(tauri::generate_handler![
-            open_file_image,
-            get_filenames_inner_zip,
-            read_image_in_zip,
-            subscribe_dir_notification,
-            change_active_window,
-        ])
 }

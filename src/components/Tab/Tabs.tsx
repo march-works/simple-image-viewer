@@ -1,4 +1,9 @@
 import { For, JSX } from 'solid-js';
+import {
+  FaSolidXmark,
+  FaSolidFolderOpen,
+  FaSolidRectangleList,
+} from 'solid-icons/fa';
 
 type TabInfo<T> = T & {
   key: string;
@@ -12,12 +17,19 @@ type Props<T> = {
   handleOnClick: (key: string) => void;
   handleOnClose: (key: string) => void;
   handleOnAdd: () => void;
+  handleOnOpenExplorer: () => void;
 };
 
 export const Tabs = <T,>(props: Props<T>) => {
   return (
     <div class="relative flex w-full flex-1 flex-col">
       <div class="flex h-8 w-full flex-none flex-row bg-neutral-800 align-baseline">
+        <div
+          class="mx-1 flex h-8 w-8 shrink-0 flex-col items-center justify-center rounded-full border-2 border-neutral-500 bg-neutral-900 text-neutral-400 transition-colors hover:bg-neutral-700 hover:text-neutral-300"
+          onClick={() => props.handleOnOpenExplorer()}
+        >
+          <FaSolidRectangleList class="h-5 w-5" />
+        </div>
         <For each={props.tabs}>
           {(tab) => (
             <div
@@ -41,16 +53,16 @@ export const Tabs = <T,>(props: Props<T>) => {
                 class="flex pt-0.5 h-5 w-5 justify-center rounded-full text-neutral-100 transition-colors hover:bg-neutral-500"
                 onClick={() => props.handleOnClose(tab.key)}
               >
-                <i class="fa-solid fa-xmark" />
+                <FaSolidXmark />
               </div>
             </div>
           )}
         </For>
-        <div class="ml-1 flex h-8 w-8 shrink-0 flex-col items-center justify-center rounded-full border-2 border-neutral-500 bg-neutral-900 text-neutral-400 transition-colors hover:bg-neutral-700 hover:text-neutral-300">
-          <i
-            class="ml-0.5 fa-solid fa-folder-open"
-            onClick={() => props.handleOnAdd()}
-          />
+        <div
+          class="ml-1 flex h-8 w-8 shrink-0 flex-col items-center justify-center rounded-full border-2 border-neutral-500 bg-neutral-900 text-neutral-400 transition-colors hover:bg-neutral-700 hover:text-neutral-300"
+          onClick={() => props.handleOnAdd()}
+        >
+          <FaSolidFolderOpen class="ml-0.5 h-5 w-5" />
         </div>
       </div>
       <div class="relative" style={{ height: 'calc(100% - 2rem)' }}>

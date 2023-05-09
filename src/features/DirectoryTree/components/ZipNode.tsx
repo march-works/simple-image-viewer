@@ -1,6 +1,7 @@
 import { Component, createEffect } from 'solid-js';
 import { Zip } from '../types/DirectoryTree';
 import { NodeBaseStyle } from './NodeBaseStyle';
+import { FaSolidImage } from 'solid-icons/fa';
 
 type Props = {
   node: Zip;
@@ -30,7 +31,7 @@ export const ZipNode: Component<Props> = (props) => {
         props.onClick && props.onClick(props.node.path + props.node.name)
       }
     >
-      <i class="fa-solid fa-image" />
+      <FaSolidImage />
       <div class="hidden lg:block">{props.node.name}</div>
     </NodeBaseStyle>
   );

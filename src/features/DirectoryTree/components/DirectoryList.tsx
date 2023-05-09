@@ -13,7 +13,7 @@ type Props = {
 
 export const DirectoryList: Component<Props> = (props) => {
   return (
-    <div class="flex flex-col">
+    <div class="flex flex-col overflow-x-hidden">
       <For each={props.tree}>
         {(node) =>
           match(node)
