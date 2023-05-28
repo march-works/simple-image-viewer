@@ -5,8 +5,14 @@ export type Directory = {
   children: DirectoryTree[];
 };
 
-export type File = {
-  type: 'File';
+export type Image = {
+  type: 'Image';
+  name: string;
+  path: string;
+};
+
+export type Video = {
+  type: 'Video';
   name: string;
   path: string;
 };
@@ -17,4 +23,6 @@ export type Zip = {
   path: string;
 };
 
-export type DirectoryTree = Directory | File | Zip;
+export type File = Image | Video | Zip;
+
+export type DirectoryTree = Directory | File;
