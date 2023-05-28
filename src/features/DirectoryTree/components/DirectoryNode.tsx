@@ -1,7 +1,7 @@
 import { Component, createSignal, For, Show } from 'solid-js';
 import { match } from 'ts-pattern';
 import { Directory, DirectoryTree } from '../types/DirectoryTree';
-import { FileNode } from './FileNode';
+import { ImageNode } from './ImageNode';
 import { NodeBaseStyle } from './NodeBaseStyle';
 import { ZipNode } from './ZipNode';
 import {
@@ -10,6 +10,7 @@ import {
   FaSolidFolderOpen,
   FaSolidFolder,
 } from 'solid-icons/fa';
+import { VideoNode } from './VideoNode';
 
 type Props = {
   tree: Directory;
@@ -47,8 +48,15 @@ export const DirectoryNode: Component<Props> = (props) => {
                     onClick={props.onClick}
                   />
                 ))
-                .with({ type: 'File' }, (nd) => (
-                  <FileNode
+                .with({ type: 'Image' }, (nd) => (
+                  <ImageNode
+                    node={nd}
+                    isSelected={nd.path === props.selected?.path}
+                    onClick={props.onClick}
+                  />
+                ))
+                .with({ type: 'Video' }, (nd) => (
+                  <VideoNode
                     node={nd}
                     isSelected={nd.path === props.selected?.path}
                     onClick={props.onClick}

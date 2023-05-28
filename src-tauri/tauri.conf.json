@@ -15,6 +15,11 @@
       "all": true,
       "fs": {
         "scope": ["**"]
+      },
+      "protocol": {
+        "all": false,
+        "asset": true,
+        "assetScope": ["**"]
       }
     },
     "bundle": {

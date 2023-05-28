@@ -1,10 +1,10 @@
 import { Component } from 'solid-js';
 import { DirectoryList } from '../components/DirectoryList';
-import { DirectoryTree, Zip, File } from '../types/DirectoryTree';
+import { DirectoryTree, File } from '../types/DirectoryTree';
 
 type Props = {
   tree: DirectoryTree[];
-  selected?: File | Zip;
+  selected?: File;
   onSelectedChanged: (entries: string) => void;
 };
 

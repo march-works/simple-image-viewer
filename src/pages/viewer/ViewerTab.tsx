@@ -14,15 +14,14 @@ import { PathSelection } from '../../features/DirectoryTree/routes/PathSelection
 import {
   DirectoryTree,
   File,
-  Zip,
 } from '../../features/DirectoryTree/types/DirectoryTree';
 import { convertEntryToTree } from '../../features/DirectoryTree/utils/convertEntryToTree';
 import { extractFirstFiles } from '../../features/DirectoryTree/utils/extractFirstFiles';
-import { filterNonImageFiles } from '../../features/DirectoryTree/utils/filterNonImageFiles';
 import { findViewingFiles } from '../../features/DirectoryTree/utils/findViewingFiles';
 import {
   isCompressedFile,
   isImageFile,
+  isVideoFile,
 } from '../../features/FilePath/utils/checkers';
 import { ImageCanvas } from '../../features/Image/routes/ImageCanvas';
 
@@ -34,11 +33,11 @@ type Props = {
 
 export const ViewerTab: Component<Props> = (props) => {
   const [tree, setTree] = createSignal<DirectoryTree[]>([]);
-  const [currentDir, setCurrentDir] = createSignal<(File | Zip)[]>([]);
+  const [currentDir, setCurrentDir] = createSignal<File[]>([]);
   let unListenRef: UnlistenFn | undefined = undefined;
   const [viewing, setViewing] = createSignal<number>(0);
-  const [selected, setSelected] = createSignal<File | Zip>();
-  const trigger = debounce((path: File | Zip) => setSelected(path), 100);
+  const [selected, setSelected] = createSignal<File>();
+  const trigger = debounce((path: File) => setSelected(path), 100);
   const [imageScale, setImageScale] = createSignal<number>(1);
   const [position, setPosition] = createSignal({ x: 0, y: 0 });
 
@@ -49,7 +48,7 @@ export const ViewerTab: Component<Props> = (props) => {
       });
       setTree(() =>
         files
-          .filter((file) => isImageFile(file))
+          .filter((file) => isImageFile(file) || isVideoFile(file))
           .sort((a, b) =>
             a.localeCompare(b, navigator.languages[0] || navigator.language, {
               numeric: true,
@@ -68,7 +67,9 @@ export const ViewerTab: Component<Props> = (props) => {
       const entries = await readDir(props.path, {
         recursive: true,
       });
-      setTree(filterNonImageFiles(entries.map(convertEntryToTree)));
+      setTree(
+        entries.map(convertEntryToTree).filter((v): v is DirectoryTree => !!v)
+      );
     }
   };
 
