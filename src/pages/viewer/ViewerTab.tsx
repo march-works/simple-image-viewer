@@ -6,6 +6,7 @@ import {
   Component,
   createEffect,
   createSignal,
+  on,
   onCleanup,
   onMount,
 } from 'solid-js';
@@ -38,6 +39,8 @@ export const ViewerTab: Component<Props> = (props) => {
   const [viewing, setViewing] = createSignal<number>(0);
   const [selected, setSelected] = createSignal<File | Zip>();
   const trigger = debounce((path: File | Zip) => setSelected(path), 100);
+  const [imageScale, setImageScale] = createSignal<number>(1);
+  const [position, setPosition] = createSignal({ x: 0, y: 0 });
 
   const readDirAndSetTree = async () => {
     if (isCompressedFile(props.path)) {
@@ -74,6 +77,7 @@ export const ViewerTab: Component<Props> = (props) => {
       currentDir().length ? (prev + 1) % currentDir().length : 0
     );
   };
+
   const moveBackward = () => {
     setViewing((prev) =>
       currentDir().length
@@ -82,11 +86,28 @@ export const ViewerTab: Component<Props> = (props) => {
     );
   };
 
+  const handleWheel = (e: WheelEvent) => {
+    e.preventDefault();
+    setImageScale((prev) =>
+      Math.min(Math.max(0.1, prev + (e.deltaY > 0 ? -0.1 : 0.1)), 3)
+    );
+  };
+
+  const zoomIn = () => {
+    setImageScale((prev) => Math.min(Math.max(0.1, prev + 0.1), 3));
+  };
+
+  const zoomOut = () => {
+    setImageScale((prev) => Math.min(Math.max(0.1, prev - 0.1), 3));
+  };
+
   const handleOnKeyDown = (event: KeyboardEvent) => {
     if (!props.isActiveTab) return;
     event.preventDefault();
     if (event.key === 'ArrowLeft') moveBackward();
     else if (event.key === 'ArrowRight') moveForward();
+    else if (event.ctrlKey && event.key === 'i') zoomIn();
+    else if (event.ctrlKey && event.key === 'o') zoomOut();
   };
 
   const handleOnButtonDown = (event: MouseEvent) => {
@@ -94,6 +115,15 @@ export const ViewerTab: Component<Props> = (props) => {
     event.preventDefault();
     if (event.button === 3) moveBackward();
     else if (event.button === 4) moveForward();
+  };
+
+  const handlePositionChange = (newPosition: { x: number; y: number }) => {
+    setPosition(newPosition);
+  };
+
+  const resetStatus = () => {
+    setImageScale(1);
+    setPosition({ x: 0, y: 0 });
   };
 
   onMount(() => {
@@ -127,6 +157,8 @@ export const ViewerTab: Component<Props> = (props) => {
     trigger(currentDir()[viewing()]);
   });
 
+  createEffect(on(selected, () => resetStatus(), { defer: true }));
+
   const handleOnSelectedChanged = (path: string) => {
     const files = findViewingFiles(path, tree());
     files && setCurrentDir(files.files);
@@ -139,6 +171,12 @@ export const ViewerTab: Component<Props> = (props) => {
         viewing={selected()}
         moveForward={moveForward}
         moveBackward={moveBackward}
+        zoomIn={zoomIn}
+        zoomOut={zoomOut}
+        imageScale={imageScale()}
+        position={position()}
+        onPositionChange={handlePositionChange}
+        handleWheel={handleWheel}
       />
       <PathSelection
         selected={currentDir()[viewing()]}

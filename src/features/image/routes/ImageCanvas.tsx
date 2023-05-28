@@ -2,16 +2,29 @@ import { invoke } from '@tauri-apps/api/tauri';
 import { Component, createEffect, createSignal } from 'solid-js';
 import { match } from 'ts-pattern';
 import { File, Zip } from '../../DirectoryTree/types/DirectoryTree';
-import { HiSolidChevronLeft, HiSolidChevronRight } from 'solid-icons/hi';
+import {
+  HiSolidChevronLeft,
+  HiSolidChevronRight,
+  HiSolidZoomIn,
+  HiSolidZoomOut,
+} from 'solid-icons/hi';
 
 type Props = {
   viewing?: File | Zip;
   moveForward: () => void;
   moveBackward: () => void;
+  zoomIn: () => void;
+  zoomOut: () => void;
+  imageScale: number;
+  position: { x: number; y: number };
+  onPositionChange: (position: { x: number; y: number }) => void;
+  handleWheel: (e: WheelEvent) => void;
 };
 
 export const ImageCanvas: Component<Props> = (props) => {
   const [data, setData] = createSignal<string>('');
+  const [isDragging, setIsDragging] = createSignal(false);
+  const [initialPosition, setInitialPosition] = createSignal({ x: 0, y: 0 });
 
   const convertPathToData = async (file: File) => {
     if (file.path === '') return '';
@@ -23,6 +36,29 @@ export const ImageCanvas: Component<Props> = (props) => {
       path: file.path,
       filename: file.name,
     });
+  };
+  const handleMouseDown = (event: MouseEvent) => {
+    event.preventDefault();
+    if (event.button === 0) {
+      setIsDragging(true);
+      setInitialPosition({ x: event.clientX, y: event.clientY });
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  const handleMouseMove = (event: MouseEvent) => {
+    if (isDragging()) {
+      const dx = event.clientX - initialPosition().x;
+      const dy = event.clientY - initialPosition().y;
+      props.onPositionChange({
+        x: props.position.x + dx,
+        y: props.position.y + dy,
+      });
+      setInitialPosition({ x: event.clientX, y: event.clientY });
+    }
   };
 
   createEffect(() => {
@@ -51,8 +87,39 @@ export const ImageCanvas: Component<Props> = (props) => {
       >
         <HiSolidChevronLeft class="text-6xl" />
       </div>
-      <div class="relative flex flex-1 content-center justify-center">
-        <img class="object-contain" src={`data:image/jpeg;base64,${data()}`} />
+      <div class="relative flex content-center" style={{ flex: 2 }}>
+        <div
+          class="max-w-full max-h-full object-cover object-center relative flex flex-1 content-center justify-center overflow-hidden"
+          onMouseDown={handleMouseDown}
+          onMouseUp={handleMouseUp}
+          onMouseMove={handleMouseMove}
+          onWheel={(e) => props.handleWheel(e)}
+        >
+          <img
+            class="w-full h-full object-contain"
+            src={`data:image/jpeg;base64,${data()}`}
+            style={{
+              transform: `scale(${props.imageScale}) translate(${props.position.x}px, ${props.position.y}px)`,
+              position: 'absolute',
+              left: '0',
+              top: '0',
+            }}
+          />
+        </div>
+        <div class="fixed bottom-3 left-0 w-full flex justify-center gap-10">
+          <div
+            class="flex cursor-pointer opacity-20 transition-colors hover:opacity-100 items-center justify-center"
+            onClick={() => props.zoomIn()}
+          >
+            <HiSolidZoomIn class="text-3xl" />
+          </div>
+          <div
+            class="flex cursor-pointer opacity-20 transition-colors hover:opacity-100 items-center justify-center"
+            onClick={() => props.zoomOut()}
+          >
+            <HiSolidZoomOut class="text-3xl" />
+          </div>
+        </div>
       </div>
       <div
         class="flex cursor-pointer items-center opacity-50 transition-colors hover:bg-neutral-800 hover:opacity-100"
