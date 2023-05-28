@@ -2,7 +2,12 @@ import { invoke } from '@tauri-apps/api/tauri';
 import { Component, createEffect, createSignal } from 'solid-js';
 import { match } from 'ts-pattern';
 import { File, Zip } from '../../DirectoryTree/types/DirectoryTree';
-import { HiSolidChevronLeft, HiSolidChevronRight } from 'solid-icons/hi';
+import {
+  HiSolidChevronLeft,
+  HiSolidChevronRight,
+  HiSolidZoomIn,
+  HiSolidZoomOut,
+} from 'solid-icons/hi';
 
 type Props = {
   viewing?: File | Zip;
@@ -88,7 +93,7 @@ export const ImageCanvas: Component<Props> = (props) => {
           onMouseDown={handleMouseDown}
           onMouseUp={handleMouseUp}
           onMouseMove={handleMouseMove}
-          onWheel={props.handleWheel}
+          onWheel={(e) => props.handleWheel(e)}
         >
           <img
             class="w-full h-full object-contain"
@@ -101,19 +106,19 @@ export const ImageCanvas: Component<Props> = (props) => {
             }}
           />
         </div>
-        <div class="absolute fixed bottom-0 left-0 w-full flex justify-center items-end">
-          <button
-            class="w-20 h-20 flex cursor-pointer opacity-50 transition-colors hover:opacity-100 items-center justify-center"
+        <div class="fixed bottom-3 left-0 w-full flex justify-center gap-10">
+          <div
+            class="flex cursor-pointer opacity-20 transition-colors hover:opacity-100 items-center justify-center"
             onClick={() => props.zoomIn()}
           >
-            <i class="fa-solid fa-regular fa-magnifying-glass-plus p-2 text-4xl" />
-          </button>
-          <button
-            class="w-20 h-20 flex cursor-pointer opacity-50 transition-colors hover:opacity-100 items-center justify-center"
+            <HiSolidZoomIn class="text-3xl" />
+          </div>
+          <div
+            class="flex cursor-pointer opacity-20 transition-colors hover:opacity-100 items-center justify-center"
             onClick={() => props.zoomOut()}
           >
-            <i class=" fa-regular fa-magnifying-glass-minus p-2 text-4xl" />
-          </button>
+            <HiSolidZoomOut class="text-3xl" />
+          </div>
         </div>
       </div>
       <div

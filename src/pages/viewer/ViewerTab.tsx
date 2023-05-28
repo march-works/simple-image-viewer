@@ -6,6 +6,7 @@ import {
   Component,
   createEffect,
   createSignal,
+  on,
   onCleanup,
   onMount,
 } from 'solid-js';
@@ -75,7 +76,6 @@ export const ViewerTab: Component<Props> = (props) => {
     setViewing((prev) =>
       currentDir().length ? (prev + 1) % currentDir().length : 0
     );
-    resetStatus();
   };
 
   const moveBackward = () => {
@@ -84,7 +84,6 @@ export const ViewerTab: Component<Props> = (props) => {
         ? (prev - 1 + currentDir().length) % currentDir().length
         : 0
     );
-    resetStatus();
   };
 
   const handleWheel = (e: WheelEvent) => {
@@ -158,11 +157,12 @@ export const ViewerTab: Component<Props> = (props) => {
     trigger(currentDir()[viewing()]);
   });
 
+  createEffect(on(selected, () => resetStatus(), { defer: true }));
+
   const handleOnSelectedChanged = (path: string) => {
     const files = findViewingFiles(path, tree());
     files && setCurrentDir(files.files);
     files && setViewing(files.page);
-    resetStatus();
   };
 
   return (
