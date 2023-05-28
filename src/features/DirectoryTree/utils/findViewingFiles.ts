@@ -1,4 +1,5 @@
-import { DirectoryTree, File, Zip } from '../types/DirectoryTree';
+import { match } from 'ts-pattern';
+import { DirectoryTree, File } from '../types/DirectoryTree';
 
 export const findViewingFiles = (
   path: string,
@@ -6,23 +7,21 @@ export const findViewingFiles = (
 ):
   | {
       page: number;
-      files: (File | Zip)[];
+      files: File[];
     }
   | undefined => {
-  const validFiles = dirs.filter(
-    (dir) => dir.type === 'File' || dir.type === 'Zip'
-  );
-  const found = validFiles.findIndex((dir) =>
-    dir.type === 'File'
-      ? dir.path === path
-      : dir.type === 'Zip'
-      ? dir.path + dir.name === path
-      : false
+  const files = dirs.filter((dir): dir is File => dir.type !== 'Directory');
+  const found = files.findIndex((dir) =>
+    match(dir)
+      .with({ type: 'Image' }, () => path === dir.path)
+      .with({ type: 'Video' }, () => path === dir.path)
+      .with({ type: 'Zip' }, () => dir.path + dir.name === path)
+      .exhaustive()
   );
   if (found !== -1) {
     return {
       page: found,
-      files: validFiles.map((dir) => dir as File | Zip),
+      files: files.map((dir) => dir),
     };
   }
   for (const dir of dirs) {
