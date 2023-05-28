@@ -9,7 +9,9 @@
     "serve": "vite preview",
     "tauri": "tauri",
     "lint": "eslint src/ --ext .js,.jsx,.ts,.tsx",
-    "format": "prettier --write \"src/**/*.{js,jsx,ts,tsx,css,md,json}\" ",
+    "format-web": "prettier --write \"src/**/*.{js,jsx,ts,tsx,css,md,json}\" ",
+    "format-back": "cd src-tauri && cargo fmt && cargo clippy --fix --allow-dirty --allow-staged",
+    "format": "pnpm format-web && pnpm format-back",
     "lint-fix": "pnpm run lint && pnpm run format",
     "prepare": "husky install"
   },
