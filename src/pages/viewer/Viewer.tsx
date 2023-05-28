@@ -1,20 +1,20 @@
 import { open } from '@tauri-apps/api/dialog';
-import { Tabs } from './components/Tab/Tabs';
-import { ViewerTab } from './pages/viewer/ViewerTab';
-import { ImageExtensions } from './features/filepath/consts/images';
-import { CompressedExtensions } from './features/filepath/consts/compressed';
+import { Tabs } from '../../components/Tab/Tabs';
+import { ViewerTab } from './ViewerTab';
+import { ImageExtensions } from '../../features/filepath/consts/images';
+import { CompressedExtensions } from '../../features/filepath/consts/compressed';
 import {
   isCompressedFile,
   isImageFile,
-} from './features/filepath/utils/checkers';
+} from '../../features/filepath/utils/checkers';
 import {
   getFileNameWithoutExtension,
   getParentDirectoryName,
   getParentDirectoryPath,
-} from './features/filepath/utils/converters';
+} from '../../features/filepath/utils/converters';
 import { getMatches } from '@tauri-apps/api/cli';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
-import { appWindow } from '@tauri-apps/api/window';
+import { appWindow, WebviewWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api';
 import { createSignal, onCleanup, onMount } from 'solid-js';
 
@@ -25,7 +25,7 @@ type TabState = {
   initFilePath?: string;
 }[];
 
-const App = () => {
+const Viewer = () => {
   const [activeKey, setActiveKey] = createSignal<string>();
   const [panes, setPanes] = createSignal<TabState>([]);
   let newTabIndex = 0;
@@ -118,6 +118,13 @@ const App = () => {
     setActiveKey(() => newActiveKey);
   };
 
+  const openExplorer = () => {
+    new WebviewWindow('explorer', {
+      url: '../../../explorer.html',
+      title: 'Image Explorer',
+    });
+  };
+
   return (
     <div class="App flex h-screen w-screen select-none bg-neutral-900 text-neutral-100">
       <Tabs
@@ -133,9 +140,10 @@ const App = () => {
         handleOnClick={onChange}
         handleOnClose={remove}
         handleOnAdd={add}
+        handleOnOpenExplorer={openExplorer}
       />
     </div>
   );
 };
 
-export default App;
+export default Viewer;

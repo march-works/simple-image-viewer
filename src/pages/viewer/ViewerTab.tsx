@@ -1,7 +1,7 @@
 import { debounce } from '@solid-primitives/scheduled';
 import { invoke } from '@tauri-apps/api';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
-import { FileEntry, readDir } from '@tauri-apps/api/fs';
+import { readDir } from '@tauri-apps/api/fs';
 import {
   Component,
   createEffect,
@@ -11,11 +11,14 @@ import {
 } from 'solid-js';
 import { PathSelection } from '../../features/DirectoryTree/routes/PathSelection';
 import {
-  Directory,
   DirectoryTree,
   File,
   Zip,
 } from '../../features/DirectoryTree/types/DirectoryTree';
+import { convertEntryToTree } from '../../features/DirectoryTree/utils/convertEntryToTree';
+import { extractFirstFiles } from '../../features/DirectoryTree/utils/extractFirstFiles';
+import { filterNonImageFiles } from '../../features/DirectoryTree/utils/filterNonImageFiles';
+import { findViewingFiles } from '../../features/DirectoryTree/utils/findViewingFiles';
 import {
   isCompressedFile,
   isImageFile,
@@ -37,43 +40,6 @@ export const ViewerTab: Component<Props> = (props) => {
   const trigger = debounce((path: File | Zip) => setSelected(path), 100);
   const [imageScale, setImageScale] = createSignal<number>(1);
   const [position, setPosition] = createSignal({ x: 0, y: 0 });
-
-  const convertEntryToTree = (entry: FileEntry): DirectoryTree => {
-    if (entry.children === null || entry.children === undefined) {
-      return {
-        type: 'File',
-        name: entry.name ?? '',
-        path: entry.path,
-      };
-    }
-    return {
-      type: 'Directory',
-      name: entry.name ?? '',
-      path: entry.path,
-      children: entry.children
-        .map(convertEntryToTree)
-        .sort((a, b) =>
-          a.name.localeCompare(
-            b.name,
-            navigator.languages[0] || navigator.language,
-            { numeric: true, ignorePunctuation: true }
-          )
-        ),
-    };
-  };
-
-  const filterNonImageFiles = (tree: DirectoryTree[]): DirectoryTree[] => {
-    return tree
-      .map((file) =>
-        file.type === 'Directory'
-          ? {
-              ...file,
-              children: filterNonImageFiles(file.children),
-            }
-          : file
-      )
-      .filter((file) => file.type === 'Directory' || isImageFile(file.name));
-  };
 
   const readDirAndSetTree = async () => {
     if (isCompressedFile(props.path)) {
@@ -178,24 +144,6 @@ export const ViewerTab: Component<Props> = (props) => {
     document.removeEventListener('mouseup', handleOnButtonDown, false);
   });
 
-  const extractFirstFiles = (entries: DirectoryTree[]): (File | Zip)[] => {
-    const files = entries
-      .filter((entry) => entry.type === 'File' || entry.type === 'Zip')
-      .map((entry) => entry as File | Zip);
-    if (files.length) {
-      return files;
-    }
-
-    const dirs = entries
-      .filter((entry) => entry.type === 'Directory')
-      .map((entry) => entry as Directory);
-    for (const dir of dirs) {
-      const files = extractFirstFiles(dir.children);
-      if (files.length) return files;
-    }
-    return [];
-  };
-
   createEffect(() => {
     if (props.initFilePath) {
       handleOnSelectedChanged(props.initFilePath);
@@ -209,39 +157,6 @@ export const ViewerTab: Component<Props> = (props) => {
   createEffect(() => {
     trigger(currentDir()[viewing()]);
   });
-
-  const findViewingFiles = (
-    path: string,
-    dirs: DirectoryTree[]
-  ):
-    | {
-        page: number;
-        files: (File | Zip)[];
-      }
-    | undefined => {
-    const validFiles = dirs.filter(
-      (dir) => dir.type === 'File' || dir.type === 'Zip'
-    );
-    const found = validFiles.findIndex((dir) =>
-      dir.type === 'File'
-        ? dir.path === path
-        : dir.type === 'Zip'
-        ? dir.path + dir.name === path
-        : false
-    );
-    if (found !== -1) {
-      return {
-        page: found,
-        files: validFiles.map((dir) => dir as File | Zip),
-      };
-    }
-    for (const dir of dirs) {
-      const files =
-        dir.type === 'Directory' && findViewingFiles(path, dir.children);
-      if (files) return files;
-    }
-    return undefined;
-  };
 
   const handleOnSelectedChanged = (path: string) => {
     const files = findViewingFiles(path, tree());

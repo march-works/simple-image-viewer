@@ -4,6 +4,12 @@ import { Directory, DirectoryTree } from '../types/DirectoryTree';
 import { FileNode } from './FileNode';
 import { NodeBaseStyle } from './NodeBaseStyle';
 import { ZipNode } from './ZipNode';
+import {
+  FaSolidCaretRight,
+  FaSolidCaretDown,
+  FaSolidFolderOpen,
+  FaSolidFolder,
+} from 'solid-icons/fa';
 
 type Props = {
   tree: Directory;
@@ -21,11 +27,11 @@ export const DirectoryNode: Component<Props> = (props) => {
           setOpen((prev) => !prev);
         }}
       >
-        <Show when={open()} fallback={<i class="fa-solid fa-caret-right" />}>
-          <i class="fa-solid fa-caret-down" />
+        <Show when={open()} fallback={<FaSolidCaretRight />}>
+          <FaSolidCaretDown />
         </Show>
-        <Show when={open()} fallback={<i class="fa-solid fa-folder" />}>
-          <i class="fa-solid fa-folder-open" />
+        <Show when={open()} fallback={<FaSolidFolder />}>
+          <FaSolidFolderOpen />
         </Show>
         <div class="hidden truncate lg:block">{props.tree.name}</div>
       </NodeBaseStyle>
