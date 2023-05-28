@@ -1,16 +1,30 @@
-import { invoke } from '@tauri-apps/api/tauri';
-import { Component, createEffect, createSignal } from 'solid-js';
+import { convertFileSrc, invoke } from '@tauri-apps/api/tauri';
+import {
+  Component,
+  createEffect,
+  createSignal,
+  Match,
+  Show,
+  Switch,
+} from 'solid-js';
 import { match } from 'ts-pattern';
-import { File, Zip } from '../../DirectoryTree/types/DirectoryTree';
+import {
+  Image,
+  Zip,
+  File,
+  Video,
+} from '../../DirectoryTree/types/DirectoryTree';
 import {
   HiSolidChevronLeft,
   HiSolidChevronRight,
   HiSolidZoomIn,
   HiSolidZoomOut,
 } from 'solid-icons/hi';
+import 'video.js/dist/video-js.css';
+import '@videojs/themes/dist/fantasy/index.css';
 
 type Props = {
-  viewing?: File | Zip;
+  viewing?: File;
   moveForward: () => void;
   moveBackward: () => void;
   zoomIn: () => void;
@@ -22,13 +36,17 @@ type Props = {
 };
 
 export const ImageCanvas: Component<Props> = (props) => {
-  const [data, setData] = createSignal<string>('');
+  const [data, setData] = createSignal<Pick<File, 'type'> & { data: string }>();
   const [isDragging, setIsDragging] = createSignal(false);
   const [initialPosition, setInitialPosition] = createSignal({ x: 0, y: 0 });
 
-  const convertPathToData = async (file: File) => {
+  const convertPathToData = async (file: Image) => {
     if (file.path === '') return '';
     return invoke<string>('open_file_image', { filepath: file.path });
+  };
+
+  const convertToLocalPath = async (file: Video) => {
+    return convertFileSrc(file.path);
   };
 
   const readImageInZip = async (file: Zip) => {
@@ -37,6 +55,7 @@ export const ImageCanvas: Component<Props> = (props) => {
       filename: file.name,
     });
   };
+
   const handleMouseDown = (event: MouseEvent) => {
     event.preventDefault();
     if (event.button === 0) {
@@ -63,14 +82,28 @@ export const ImageCanvas: Component<Props> = (props) => {
 
   createEffect(() => {
     match(props.viewing)
-      .with({ type: 'File' }, (file) =>
+      .with({ type: 'Image' }, (file) =>
         convertPathToData(file).then((converted) => {
-          setData(converted);
+          setData({
+            type: 'Image',
+            data: converted,
+          });
+        })
+      )
+      .with({ type: 'Video' }, (file) =>
+        convertToLocalPath(file).then((converted) => {
+          setData({
+            type: 'Video',
+            data: converted,
+          });
         })
       )
       .with({ type: 'Zip' }, (file) =>
         readImageInZip(file).then((binary) => {
-          setData(binary);
+          setData({
+            type: 'Zip',
+            data: binary,
+          });
         })
       )
       .with(undefined, () => {
@@ -95,31 +128,45 @@ export const ImageCanvas: Component<Props> = (props) => {
           onMouseMove={handleMouseMove}
           onWheel={(e) => props.handleWheel(e)}
         >
-          <img
-            class="w-full h-full object-contain"
-            src={`data:image/jpeg;base64,${data()}`}
-            style={{
-              transform: `scale(${props.imageScale}) translate(${props.position.x}px, ${props.position.y}px)`,
-              position: 'absolute',
-              left: '0',
-              top: '0',
-            }}
-          />
+          <Switch>
+            <Match when={data()?.type === 'Image' || data()?.type === 'Zip'}>
+              <img
+                class="w-full h-full object-contain"
+                src={`data:image/jpeg;base64,${data()?.data}`}
+                style={{
+                  transform: `scale(${props.imageScale}) translate(${props.position.x}px, ${props.position.y}px)`,
+                  position: 'absolute',
+                  left: '0',
+                  top: '0',
+                }}
+              />
+            </Match>
+            <Match when={data()?.type === 'Video'}>
+              <video
+                class="video-js vjs-theme-fantasy w-full h-full object-contain"
+                controls
+                preload="auto"
+                src={data()?.data}
+              />
+            </Match>
+          </Switch>
         </div>
-        <div class="fixed bottom-3 left-0 w-full flex justify-center gap-10">
-          <div
-            class="flex cursor-pointer opacity-20 transition-colors hover:opacity-100 items-center justify-center"
-            onClick={() => props.zoomIn()}
-          >
-            <HiSolidZoomIn class="text-3xl" />
+        <Show when={data()?.type === 'Image' || data()?.type === 'Zip'}>
+          <div class="fixed bottom-3 left-0 w-full flex justify-center gap-10">
+            <div
+              class="flex cursor-pointer opacity-20 transition-colors hover:opacity-100 items-center justify-center"
+              onClick={() => props.zoomIn()}
+            >
+              <HiSolidZoomIn class="text-3xl" />
+            </div>
+            <div
+              class="flex cursor-pointer opacity-20 transition-colors hover:opacity-100 items-center justify-center"
+              onClick={() => props.zoomOut()}
+            >
+              <HiSolidZoomOut class="text-3xl" />
+            </div>
           </div>
-          <div
-            class="flex cursor-pointer opacity-20 transition-colors hover:opacity-100 items-center justify-center"
-            onClick={() => props.zoomOut()}
-          >
-            <HiSolidZoomOut class="text-3xl" />
-          </div>
-        </div>
+        </Show>
       </div>
       <div
         class="flex cursor-pointer items-center opacity-50 transition-colors hover:bg-neutral-800 hover:opacity-100"
