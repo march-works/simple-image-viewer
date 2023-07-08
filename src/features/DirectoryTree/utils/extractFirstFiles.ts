@@ -1,9 +1,9 @@
-import { Directory, DirectoryTree, File, Zip } from '../types/DirectoryTree';
+import { Directory, DirectoryTree, File } from '../types/DirectoryTree';
 
-export const extractFirstFiles = (entries: DirectoryTree[]): (File | Zip)[] => {
+export const extractFirstFiles = (entries: DirectoryTree[]): File[] => {
   const files = entries
-    .filter((entry) => entry.type === 'File' || entry.type === 'Zip')
-    .map((entry) => entry as File | Zip);
+    .filter((entry) => entry.type !== 'Directory')
+    .map((entry) => entry as File);
   if (files.length) {
     return files;
   }

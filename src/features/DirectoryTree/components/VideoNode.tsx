@@ -1,15 +1,15 @@
 import { Component, createEffect } from 'solid-js';
-import { File } from '../types/DirectoryTree';
+import { Video } from '../types/DirectoryTree';
 import { NodeBaseStyle } from './NodeBaseStyle';
-import { FaSolidImage } from 'solid-icons/fa';
+import { FaSolidVideo } from 'solid-icons/fa';
 
 type Props = {
-  node: File;
+  node: Video;
   isSelected: boolean;
   onClick?: (path: string) => void;
 };
 
-export const FileNode: Component<Props> = (props) => {
+export const VideoNode: Component<Props> = (props) => {
   let nodeRef: HTMLDivElement | undefined = undefined;
 
   createEffect(() => {
@@ -30,7 +30,7 @@ export const FileNode: Component<Props> = (props) => {
       isSelected={props.isSelected}
       onClick={() => props.onClick && props.onClick(props.node.path)}
     >
-      <FaSolidImage />
+      <FaSolidVideo />
       <div class="hidden lg:block">{props.node.name}</div>
     </NodeBaseStyle>
   );
