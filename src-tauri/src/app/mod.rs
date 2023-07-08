@@ -10,16 +10,16 @@ use sysinfo::{ProcessExt, System, SystemExt};
 use tauri::{utils::platform::current_exe, Builder, Manager, Wry};
 
 use crate::{
+    app::explorer::add_tab,
+    // app::explorer::open_explorer,
+    app::explorer::explore_path,
+    app::explorer::get_page_count,
+    app::explorer::show_devices,
     app::viewer::change_active_window,
     app::viewer::get_filenames_inner_zip,
     app::viewer::open_file_image,
     app::viewer::read_image_in_zip,
     app::viewer::subscribe_dir_notification,
-    // app::explorer::open_explorer,
-    app::explorer::explore_path,
-    app::explorer::show_devices,
-    app::explorer::get_page_count,
-    app::explorer::add_tab,
     grpc::{add_tab, new_window, server},
 };
 
@@ -87,7 +87,6 @@ pub fn open_new_viewer() -> Builder<Wry> {
             read_image_in_zip,
             subscribe_dir_notification,
             change_active_window,
-
             explore_path,
             show_devices,
             get_page_count,

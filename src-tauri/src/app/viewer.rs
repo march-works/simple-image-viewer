@@ -1,6 +1,6 @@
-use std::{io::Read, path::Path, sync::Mutex};
 use base64::{engine::general_purpose, Engine as _};
 use notify::{recommended_watcher, RecursiveMode, Watcher};
+use std::{io::Read, path::Path, sync::Mutex};
 use tauri::{State, Window};
 
 #[tauri::command]
@@ -74,8 +74,7 @@ pub struct ActiveWindow {
 
 #[tauri::command]
 pub(crate) fn change_active_window(window: Window, active: State<ActiveWindow>) {
-    match active.label.lock() {
-        Ok(mut label) => *label = window.label().to_string(),
-        Err(_) => (),
+    if let Ok(mut label) = active.label.lock() {
+        *label = window.label().to_string()
     }
 }

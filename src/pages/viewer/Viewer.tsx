@@ -17,6 +17,7 @@ import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { appWindow, WebviewWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api';
 import { createSignal, onCleanup, onMount } from 'solid-js';
+import { VideoExtensions } from '../../features/filepath/consts/videos';
 
 type TabState = {
   title: string;
@@ -84,8 +85,12 @@ const Viewer = () => {
     const dir = await open({
       filters: [
         {
-          name: 'Image',
-          extensions: [...ImageExtensions, ...CompressedExtensions],
+          name: 'File',
+          extensions: [
+            ...ImageExtensions,
+            ...VideoExtensions,
+            ...CompressedExtensions,
+          ],
         },
       ],
     });

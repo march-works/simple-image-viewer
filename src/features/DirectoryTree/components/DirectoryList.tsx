@@ -2,7 +2,8 @@ import { Component, For } from 'solid-js';
 import { match } from 'ts-pattern';
 import { DirectoryTree } from '../types/DirectoryTree';
 import { DirectoryNode } from './DirectoryNode';
-import { FileNode } from './FileNode';
+import { ImageNode } from './ImageNode';
+import { VideoNode } from './VideoNode';
 import { ZipNode } from './ZipNode';
 
 type Props = {
@@ -24,8 +25,15 @@ export const DirectoryList: Component<Props> = (props) => {
                 onClick={props.onClick}
               />
             ))
-            .with({ type: 'File' }, (nd) => (
-              <FileNode
+            .with({ type: 'Image' }, (nd) => (
+              <ImageNode
+                node={nd}
+                isSelected={nd.path === props.selected?.path}
+                onClick={props.onClick}
+              />
+            ))
+            .with({ type: 'Video' }, (nd) => (
+              <VideoNode
                 node={nd}
                 isSelected={nd.path === props.selected?.path}
                 onClick={props.onClick}
