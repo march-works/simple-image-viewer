@@ -19,8 +19,7 @@ import { extractFirstFiles } from '../../features/DirectoryTree/utils/extractFir
 import { findViewingFiles } from '../../features/DirectoryTree/utils/findViewingFiles';
 import {
   isCompressedFile,
-  isImageFile,
-  isVideoFile,
+  isExecutableFile,
 } from '../../features/FilePath/utils/checkers';
 import { ImageCanvas } from '../../features/Image/ImageCanvas';
 
@@ -45,7 +44,7 @@ export const ViewerTab: Component<Props> = (props) => {
       });
       setTree(() =>
         files
-          .filter((file) => isImageFile(file) || isVideoFile(file))
+          .filter((file) => isExecutableFile(file))
           .sort((a, b) =>
             a.localeCompare(b, navigator.languages[0] || navigator.language, {
               numeric: true,
