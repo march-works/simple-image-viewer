@@ -5,7 +5,7 @@ import { ImageExtensions } from '../../features/filepath/consts/images';
 import { CompressedExtensions } from '../../features/filepath/consts/compressed';
 import {
   isCompressedFile,
-  isImageFile,
+  isExecutableFile,
 } from '../../features/filepath/utils/checkers';
 import {
   getFileNameWithoutExtension,
@@ -66,7 +66,7 @@ const Viewer = () => {
     const newActiveKey = `newTab${newTabIndex++}`;
     setPanes((prevPanes) => {
       const newPanes = [...prevPanes];
-      const title = isImageFile(dir)
+      const title = isExecutableFile(dir)
         ? getParentDirectoryName(dir)
         : getFileNameWithoutExtension(dir);
       const path = isCompressedFile(dir) ? dir : getParentDirectoryPath(dir);
@@ -74,7 +74,7 @@ const Viewer = () => {
         title: title,
         key: newActiveKey,
         path: path,
-        initFilePath: isImageFile(dir) ? dir : undefined,
+        initFilePath: isExecutableFile(dir) ? dir : undefined,
       });
       return newPanes;
     });

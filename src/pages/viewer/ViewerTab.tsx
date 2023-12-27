@@ -6,7 +6,6 @@ import {
   Component,
   createEffect,
   createSignal,
-  on,
   onCleanup,
   onMount,
 } from 'solid-js';
@@ -20,10 +19,9 @@ import { extractFirstFiles } from '../../features/DirectoryTree/utils/extractFir
 import { findViewingFiles } from '../../features/DirectoryTree/utils/findViewingFiles';
 import {
   isCompressedFile,
-  isImageFile,
-  isVideoFile,
+  isExecutableFile,
 } from '../../features/FilePath/utils/checkers';
-import { ImageCanvas } from '../../features/Image/routes/ImageCanvas';
+import { ImageCanvas } from '../../features/Image/ImageCanvas';
 
 type Props = {
   isActiveTab: boolean;
@@ -38,8 +36,6 @@ export const ViewerTab: Component<Props> = (props) => {
   const [viewing, setViewing] = createSignal<number>(0);
   const [selected, setSelected] = createSignal<File>();
   const trigger = debounce((path: File) => setSelected(path), 100);
-  const [imageScale, setImageScale] = createSignal<number>(1);
-  const [position, setPosition] = createSignal({ x: 0, y: 0 });
 
   const readDirAndSetTree = async () => {
     if (isCompressedFile(props.path)) {
@@ -48,7 +44,7 @@ export const ViewerTab: Component<Props> = (props) => {
       });
       setTree(() =>
         files
-          .filter((file) => isImageFile(file) || isVideoFile(file))
+          .filter((file) => isExecutableFile(file))
           .sort((a, b) =>
             a.localeCompare(b, navigator.languages[0] || navigator.language, {
               numeric: true,
@@ -87,28 +83,11 @@ export const ViewerTab: Component<Props> = (props) => {
     );
   };
 
-  const handleWheel = (e: WheelEvent) => {
-    e.preventDefault();
-    setImageScale((prev) =>
-      Math.min(Math.max(0.1, prev + (e.deltaY > 0 ? -0.1 : 0.1)), 3)
-    );
-  };
-
-  const zoomIn = () => {
-    setImageScale((prev) => Math.min(Math.max(0.1, prev + 0.1), 3));
-  };
-
-  const zoomOut = () => {
-    setImageScale((prev) => Math.min(Math.max(0.1, prev - 0.1), 3));
-  };
-
   const handleOnKeyDown = (event: KeyboardEvent) => {
     if (!props.isActiveTab) return;
     event.preventDefault();
     if (event.key === 'ArrowLeft') moveBackward();
     else if (event.key === 'ArrowRight') moveForward();
-    else if (event.ctrlKey && event.key === 'i') zoomIn();
-    else if (event.ctrlKey && event.key === 'o') zoomOut();
   };
 
   const handleOnButtonDown = (event: MouseEvent) => {
@@ -116,15 +95,6 @@ export const ViewerTab: Component<Props> = (props) => {
     event.preventDefault();
     if (event.button === 3) moveBackward();
     else if (event.button === 4) moveForward();
-  };
-
-  const handlePositionChange = (newPosition: { x: number; y: number }) => {
-    setPosition(newPosition);
-  };
-
-  const resetStatus = () => {
-    setImageScale(1);
-    setPosition({ x: 0, y: 0 });
   };
 
   onMount(() => {
@@ -158,8 +128,6 @@ export const ViewerTab: Component<Props> = (props) => {
     trigger(currentDir()[viewing()]);
   });
 
-  createEffect(on(selected, () => resetStatus(), { defer: true }));
-
   const handleOnSelectedChanged = (path: string) => {
     const files = findViewingFiles(path, tree());
     files && setCurrentDir(files.files);
@@ -172,12 +140,6 @@ export const ViewerTab: Component<Props> = (props) => {
         viewing={selected()}
         moveForward={moveForward}
         moveBackward={moveBackward}
-        zoomIn={zoomIn}
-        zoomOut={zoomOut}
-        imageScale={imageScale()}
-        position={position()}
-        onPositionChange={handlePositionChange}
-        handleWheel={handleWheel}
       />
       <PathSelection
         selected={currentDir()[viewing()]}

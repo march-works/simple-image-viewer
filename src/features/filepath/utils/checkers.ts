@@ -13,3 +13,6 @@ export const isImageFile = (filepath: string): boolean => {
 export const isVideoFile = (filepath: string): boolean => {
   return VideoExtensions.some((ext) => filepath.endsWith(`.${ext}`));
 };
+
+export const isExecutableFile = (filepath: string): boolean =>
+  isImageFile(filepath) || isVideoFile(filepath);
