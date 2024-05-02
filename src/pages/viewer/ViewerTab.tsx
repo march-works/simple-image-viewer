@@ -18,7 +18,10 @@ import { convertEntryToTree } from '../../features/DirectoryTree/utils/convertEn
 import { extractFirstFiles } from '../../features/DirectoryTree/utils/extractFirstFiles';
 import { findViewingFiles } from '../../features/DirectoryTree/utils/findViewingFiles';
 import { ImageCanvas } from '../../features/Image/ImageCanvas';
-import { isCompressedFile, isExecutableFile } from '../../features/filepath/utils/checkers';
+import {
+  isCompressedFile,
+  isExecutableFile,
+} from '../../features/filepath/utils/checkers';
 
 type Props = {
   isActiveTab: boolean;

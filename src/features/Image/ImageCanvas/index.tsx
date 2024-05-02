@@ -18,10 +18,7 @@ import {
   File,
   Video,
 } from '../../DirectoryTree/types/DirectoryTree';
-import {
-  HiSolidChevronLeft,
-  HiSolidChevronRight,
-} from 'solid-icons/hi';
+import { HiSolidChevronLeft, HiSolidChevronRight } from 'solid-icons/hi';
 import { AiOutlineZoomIn, AiOutlineZoomOut } from 'solid-icons/ai';
 import 'video.js/dist/video-js.css';
 import '@videojs/themes/dist/fantasy/index.css';
