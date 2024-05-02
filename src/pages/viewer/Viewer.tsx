@@ -4,20 +4,17 @@ import { ViewerTab } from './ViewerTab';
 import { ImageExtensions } from '../../features/filepath/consts/images';
 import { CompressedExtensions } from '../../features/filepath/consts/compressed';
 import {
-  isCompressedFile,
-  isExecutableFile,
-} from '../../features/filepath/utils/checkers';
-import {
   getFileNameWithoutExtension,
   getParentDirectoryName,
   getParentDirectoryPath,
-} from '../../features/filepath/utils/converters';
+} from '../../features/FilePath/utils/converters';
 import { getMatches } from '@tauri-apps/api/cli';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { appWindow, WebviewWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api';
 import { createSignal, onCleanup, onMount } from 'solid-js';
 import { VideoExtensions } from '../../features/filepath/consts/videos';
+import { isExecutableFile, isCompressedFile } from '../../features/filepath/utils/checkers';
 
 type TabState = {
   title: string;
