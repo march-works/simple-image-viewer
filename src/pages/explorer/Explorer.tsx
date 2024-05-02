@@ -54,8 +54,7 @@ const Explorer = () => {
       invoke<number>('get_page_count', {
         filepath: root(),
       }).then((v) => setEnd(v));
-  }
-
+  };
 
   createEffect(() => {
     refresh();
@@ -97,7 +96,7 @@ const Explorer = () => {
       to,
     });
     refresh();
-  }
+  };
 
   return (
     <div class="App flex h-screen w-screen select-none bg-neutral-900 text-neutral-100 overflow-hidden">
@@ -117,13 +116,16 @@ const Explorer = () => {
               <FaSolidRectangleList class="h-5 w-5" />
             </div>
           </div>
-          <div class="mr-1 p-2 flex flex-row h-8 shrink-0 items-center justify-center rounded-full border-2 border-neutral-500 bg-neutral-900 text-neutral-400 transition-colors hover:bg-neutral-700 hover:text-neutral-300"
+          <div
+            class="mr-1 p-2 flex flex-row h-8 shrink-0 items-center justify-center rounded-full border-2 border-neutral-500 bg-neutral-900 text-neutral-400 transition-colors hover:bg-neutral-700 hover:text-neutral-300"
             onClick={() => {
               selectTransferPath();
             }}
           >
             <RiDocumentFolderTransferFill class="ml-0.5 h-5 w-5" />
-            <span class="text-xs">{transferPath() ? '転送先を変更する' : '転送先を設定する'}</span>
+            <span class="text-xs">
+              {transferPath() ? '転送先を変更する' : '転送先を設定する'}
+            </span>
           </div>
         </div>
         <div
@@ -131,15 +133,21 @@ const Explorer = () => {
           style={{ height: 'calc(100% - 2rem)' }}
         >
           <For each={folders()}>
-            {(item) => <Folder thumb={item} onMarkedAsRead={(path) => {
-              console.log(path);
-              console.log(transferPath());
-              const to = transferPath();
-              if (!to) {
-                return;
-              }
-              transfer(path, to);
-            }} onClick={onClick} />}
+            {(item) => (
+              <Folder
+                thumb={item}
+                onMarkedAsRead={(path) => {
+                  console.log(path);
+                  console.log(transferPath());
+                  const to = transferPath();
+                  if (!to) {
+                    return;
+                  }
+                  transfer(path, to);
+                }}
+                onClick={onClick}
+              />
+            )}
           </For>
         </div>
         <div class="p-1 h-12 self-center">

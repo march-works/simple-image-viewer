@@ -13,10 +13,15 @@ export const Folder: Component<Props> = (props) => {
   const [isRead, setIsRead] = createSignal<boolean>(false);
   return (
     <div class="flex flex-col w-48 h-48 overflow-hidden relative">
-      <button class={`absolute top-0 right-4 ${isRead() ? "text-green-400" : "text-white"}`} onClick={() => {
-        setIsRead(!isRead());
-        props.onMarkedAsRead(props.thumb.path);
-      }}>
+      <button
+        class={`absolute top-0 right-4 ${
+          isRead() ? 'text-green-400' : 'text-white'
+        }`}
+        onClick={() => {
+          setIsRead(!isRead());
+          props.onMarkedAsRead(props.thumb.path);
+        }}
+      >
         <FaSolidCheck class="w-6 h-6" />
       </button>
       <img
