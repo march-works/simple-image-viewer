@@ -1,9 +1,5 @@
 import { For, JSX } from 'solid-js';
-import {
-  FaSolidXmark,
-  FaSolidFolderOpen,
-  FaSolidRectangleList,
-} from 'solid-icons/fa';
+import { FaSolidXmark, FaSolidFolderOpen, FaSolidImages } from 'solid-icons/fa';
 
 type TabInfo<T> = T & {
   key: string;
@@ -28,7 +24,7 @@ export const Tabs = <T,>(props: Props<T>) => {
           class="mx-1 flex h-8 w-8 shrink-0 flex-col items-center justify-center rounded-full border-2 border-neutral-500 bg-neutral-900 text-neutral-400 transition-colors hover:bg-neutral-700 hover:text-neutral-300"
           onClick={() => props.handleOnOpenExplorer()}
         >
-          <FaSolidRectangleList class="h-5 w-5" />
+          <FaSolidImages class="h-5 w-5" />
         </div>
         <For each={props.tabs}>
           {(tab) => (

@@ -6,7 +6,7 @@ pub mod explorer;
 use std::sync::Mutex;
 
 use serde_json::Value;
-use sysinfo::{ProcessExt, System, SystemExt};
+use sysinfo::System;
 use tauri::{utils::platform::current_exe, Builder, Manager, Wry};
 
 use crate::{
@@ -15,6 +15,7 @@ use crate::{
     app::explorer::explore_path,
     app::explorer::get_page_count,
     app::explorer::show_devices,
+    app::explorer::transfer_folder,
     app::viewer::change_active_window,
     app::viewer::get_filenames_inner_zip,
     app::viewer::open_file_image,
@@ -41,9 +42,8 @@ fn get_running_count() -> i32 {
             if app_exe
                 == *process
                     .exe()
-                    .file_name()
+                    .map(|v| v.file_name().unwrap_or_default().to_str())
                     .unwrap_or_default()
-                    .to_str()
                     .unwrap_or_default()
             {
                 cnt += 1;
@@ -90,6 +90,7 @@ pub fn open_new_viewer() -> Builder<Wry> {
             explore_path,
             show_devices,
             get_page_count,
+            transfer_folder,
             add_tab,
         ])
 }
