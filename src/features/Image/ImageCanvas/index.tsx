@@ -21,9 +21,8 @@ import {
 import {
   HiSolidChevronLeft,
   HiSolidChevronRight,
-  HiSolidZoomIn,
-  HiSolidZoomOut,
 } from 'solid-icons/hi';
+import { AiOutlineZoomIn, AiOutlineZoomOut } from 'solid-icons/ai';
 import 'video.js/dist/video-js.css';
 import '@videojs/themes/dist/fantasy/index.css';
 
@@ -196,13 +195,13 @@ export const ImageCanvas: Component<Props> = (props) => {
               class="flex cursor-pointer opacity-20 transition-colors hover:opacity-100 items-center justify-center"
               onClick={zoomIn}
             >
-              <HiSolidZoomIn class="text-3xl" />
+              <AiOutlineZoomIn class="text-3xl" />
             </div>
             <div
               class="flex cursor-pointer opacity-20 transition-colors hover:opacity-100 items-center justify-center"
               onClick={zoomOut}
             >
-              <HiSolidZoomOut class="text-3xl" />
+              <AiOutlineZoomOut class="text-3xl" />
             </div>
           </div>
         </Show>

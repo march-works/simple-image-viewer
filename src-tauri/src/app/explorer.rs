@@ -1,9 +1,10 @@
 use std::fs::read_dir;
 
 use base64::engine::{general_purpose, Engine as _};
+use fs_extra::dir::{move_dir, CopyOptions};
 use serde::Serialize;
 
-use sysinfo::{DiskExt, System, SystemExt};
+use sysinfo::Disks;
 use tauri::{AppHandle, Manager};
 #[allow(unused_imports)]
 use tokio_stream::StreamExt;
@@ -75,10 +76,8 @@ pub(crate) fn explore_path(filepath: String, page: usize) -> Result<Vec<Thumbnai
 
 #[tauri::command]
 pub(crate) fn show_devices() -> Result<Vec<Thumbnail>, String> {
-    let mut system = System::new();
-    system.refresh_disks_list();
-    Ok(system
-        .disks()
+    let disks = Disks::new_with_refreshed_list();
+    Ok(disks
         .iter()
         .map(|v| {
             let file = v.mount_point().to_str().unwrap_or_default().to_string();
@@ -114,5 +113,12 @@ pub(crate) async fn add_tab(filepath: String, app: AppHandle) -> Result<(), Stri
                 })
         },
     );
+    Ok(())
+}
+
+#[tauri::command]
+pub(crate) async fn transfer_folder(from: String, to: String) -> Result<(), String> {
+    let options = CopyOptions::new();
+    move_dir(from, to, &options).map_err(|_| "failed to move folder")?;
     Ok(())
 }
