@@ -55,8 +55,6 @@ const Viewer = () => {
   });
 
   onCleanup(async () => {
-    console.log('cleanup');
-    await invoke('close_window', { label: appWindow.label })
     window.removeEventListener('focus', handleOnFocus, false);
     unListenRef && unListenRef();
   });

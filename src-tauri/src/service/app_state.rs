@@ -52,6 +52,19 @@ pub(crate) async fn add_window_state<'a>(state: &State<'a, AppState>) -> Result<
     Ok(label)
 }
 
+pub(crate) async fn remove_window_state<'a>(
+    label: String,
+    state: State<'a, AppState>,
+) -> Result<(), String> {
+    let mut windows = state.windows.lock().await;
+    let index = (*windows)
+        .iter()
+        .position(|w| w.label == label)
+        .ok_or_else(|| "window not found".to_string())?;
+    (*windows).remove(index);
+    Ok(())
+}
+
 pub(crate) async fn add_tab_state<'a>(
     path: &String,
     label: &String,
