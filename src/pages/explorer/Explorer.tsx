@@ -62,8 +62,8 @@ const Explorer = () => {
 
   const onClick = (thumb: Thumbnail) => {
     if (thumb.thumbnail) {
-      invoke('add_tab', {
-        filepath: thumb.thumbpath,
+      invoke('open_new_tab', {
+        path: thumb.thumbpath,
       });
     } else {
       setFolders([]);

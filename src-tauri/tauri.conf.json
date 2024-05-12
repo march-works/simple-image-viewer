@@ -8,7 +8,7 @@
   },
   "package": {
     "productName": "simple-image-viewer",
-    "version": "0.1.15"
+    "version": "0.1.16"
   },
   "tauri": {
     "allowlist": {
@@ -68,6 +68,7 @@
     },
     "windows": [
       {
+        "label": "label-0",
         "fullscreen": false,
         "height": 600,
         "resizable": true,

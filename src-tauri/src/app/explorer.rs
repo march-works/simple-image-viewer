@@ -5,11 +5,8 @@ use fs_extra::dir::{move_dir, CopyOptions};
 use serde::Serialize;
 
 use sysinfo::Disks;
-use tauri::{AppHandle, Manager};
 #[allow(unused_imports)]
 use tokio_stream::StreamExt;
-
-use super::viewer::ActiveWindow;
 
 #[derive(Clone, Serialize)]
 pub(crate) struct Thumbnail {
@@ -95,25 +92,6 @@ pub(crate) fn show_devices() -> Result<Vec<Thumbnail>, String> {
 pub(crate) async fn get_page_count(filepath: String) -> Result<usize, String> {
     let dirs = read_dir(filepath).map_err(|_| "failed to open inner path")?;
     Ok(dirs.count() / CATALOG_PER_PAGE)
-}
-
-#[tauri::command]
-pub(crate) async fn add_tab(filepath: String, app: AppHandle) -> Result<(), String> {
-    let active = app.state::<ActiveWindow>();
-    active.label.lock().map_or_else(
-        |_| {
-            app.emit_all("image-file-opened", filepath.clone())
-                .unwrap_or(())
-        },
-        |label| {
-            app.emit_to(label.as_str(), "image-file-opened", filepath.clone())
-                .unwrap_or_else(|_| {
-                    app.emit_all("image-file-opened", filepath.clone())
-                        .unwrap_or(())
-                })
-        },
-    );
-    Ok(())
 }
 
 #[tauri::command]
