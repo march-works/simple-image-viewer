@@ -8,5 +8,5 @@ pub mod new_window {
 
 pub mod app;
 pub mod grpc;
-pub mod utils;
 pub mod service;
+pub mod utils;

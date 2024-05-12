@@ -4,7 +4,8 @@ use std::{io::Read, path::Path};
 use tauri::{AppHandle, Manager, State, Window};
 
 use crate::service::app_state::{
-    add_tab_state, add_window_state, open_file_pick_dialog, remove_tab_state, ActiveTab, ActiveWindow, AppState
+    add_tab_state, add_window_state, open_file_pick_dialog, remove_tab_state, ActiveTab,
+    ActiveWindow, AppState,
 };
 
 #[tauri::command]

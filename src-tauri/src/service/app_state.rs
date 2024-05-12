@@ -3,7 +3,8 @@ use tauri::{api::dialog::blocking::FileDialogBuilder, State};
 use tokio::sync::Mutex;
 
 use crate::utils::file_utils::{
-    get_any_extensions, get_filename_without_extension, get_parent_dir, get_parent_dir_name, is_compressed_file, is_executable_file
+    get_any_extensions, get_filename_without_extension, get_parent_dir, get_parent_dir_name,
+    is_compressed_file, is_executable_file,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -89,7 +90,11 @@ pub(crate) async fn add_tab_state<'a>(
     Ok(window_state.clone())
 }
 
-pub(crate) async fn remove_tab_state(label: &String, key: &String, state: &State<'_, AppState>) -> Result<WindowState, String> {
+pub(crate) async fn remove_tab_state(
+    label: &String,
+    key: &String,
+    state: &State<'_, AppState>,
+) -> Result<WindowState, String> {
     let mut windows = state.windows.lock().await;
     let window_state = (*windows)
         .iter_mut()
