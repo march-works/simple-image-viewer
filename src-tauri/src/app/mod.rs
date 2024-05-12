@@ -129,10 +129,16 @@ pub fn open_new_viewer() -> Builder<Wry> {
             if event.menu_item_id() == "quit" {
                 tokio::spawn(async move {
                     let state = event.window().state::<AppState>();
+                    let mut active = state.active.lock().await.clone();
+                    let mut windows = state.windows.lock().await.clone();
+                    if windows.len() > 0 {
+                        active.label = "label-0".to_string();
+                        windows[0].label = "label-0".to_string();
+                    }
                     let saved_state = SavedState {
                         count: *state.count.lock().await,
-                        active: state.active.lock().await.clone(),
-                        windows: state.windows.lock().await.clone(),
+                        active,
+                        windows,
                     };
                     let dir = path::app_data_dir(&tauri::Config::default()).unwrap();
                     let path = dir.join("state.json");
@@ -143,6 +149,15 @@ pub fn open_new_viewer() -> Builder<Wry> {
                     println!("state saved to {:?}", path);
                     // quit all
                     std::process::exit(0);
+                });
+            }
+        })
+        .on_window_event(|event| {
+            if let tauri::WindowEvent::CloseRequested { .. } = event.event() {
+                tokio::spawn(async move {
+                    let state = event.window().state::<AppState>();
+                    let label = event.window().label().to_string();
+                    close_window(label, state).await
                 });
             }
         })
