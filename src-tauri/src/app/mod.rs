@@ -3,28 +3,23 @@ pub mod viewer;
 #[macro_use]
 pub mod explorer;
 
-use std::sync::Mutex;
-
 use serde_json::Value;
 use sysinfo::System;
-use tauri::{utils::platform::current_exe, Builder, Manager, Wry};
+use tauri::{api::path, async_runtime::Mutex, utils::platform::current_exe, Builder, Manager, Wry};
 
 use crate::{
-    app::explorer::add_tab,
     // app::explorer::open_explorer,
-    app::explorer::explore_path,
-    app::explorer::get_page_count,
-    app::explorer::show_devices,
-    app::explorer::transfer_folder,
-    app::viewer::change_active_window,
-    app::viewer::get_filenames_inner_zip,
-    app::viewer::open_file_image,
-    app::viewer::read_image_in_zip,
-    app::viewer::subscribe_dir_notification,
+    app::{
+        explorer::{explore_path, get_page_count, show_devices, transfer_folder},
+        viewer::{
+            change_active_tab, change_active_window, close_window, get_filenames_inner_zip,
+            open_dialog, open_file_image, open_new_tab, open_new_window, read_image_in_zip,
+            remove_tab, request_restore_state, subscribe_dir_notification,
+        },
+    },
     grpc::{add_tab, new_window, server},
+    service::app_state::{ActiveWindow, AppState, WindowState},
 };
-
-use self::viewer::ActiveWindow;
 
 fn get_running_count() -> i32 {
     let app_exe = current_exe()
@@ -52,7 +47,43 @@ fn get_running_count() -> i32 {
     cnt
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
+struct SavedState {
+    count: i32,
+    active: ActiveWindow,
+    windows: Vec<WindowState>,
+}
+
+impl Default for SavedState {
+    fn default() -> Self {
+        SavedState {
+            count: 1,
+            active: ActiveWindow {
+                label: "label-0".to_string(),
+            },
+            windows: vec![WindowState {
+                label: "label-0".to_string(),
+                count: 0,
+                active: None,
+                tabs: vec![],
+            }],
+        }
+    }
+}
+
 pub fn open_new_viewer() -> Builder<Wry> {
+    let save_dir = path::app_data_dir(&tauri::Config::default()).unwrap();
+    let save_path = save_dir.join("state.json");
+    let saved_state = if let Ok(data) = std::fs::read_to_string(save_path.clone()) {
+        serde_json::from_str::<SavedState>(&data).unwrap_or_default()
+    } else {
+        SavedState::default()
+    };
+    let app_state = AppState {
+        count: Mutex::new(saved_state.count),
+        active: Mutex::new(saved_state.active),
+        windows: Mutex::new(saved_state.windows.clone()),
+    };
     tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::default().build())
         .setup(|app| {
@@ -75,22 +106,63 @@ pub fn open_new_viewer() -> Builder<Wry> {
                 }
             } else {
                 tokio::spawn(server::run_server(app.app_handle()));
+                saved_state.windows.into_iter().for_each(|v| {
+                    let app_handle = app.app_handle();
+                    tokio::spawn(async move {
+                        let label = v.label.clone();
+                        tauri::WindowBuilder::new(
+                            &app_handle,
+                            label.clone(),
+                            tauri::WindowUrl::App("index.html".into()),
+                        )
+                        .title("Simple Image Viewer")
+                        .maximized(true)
+                        .build()
+                        .unwrap();
+                    });
+                });
             }
             Ok(())
         })
-        .manage(ActiveWindow {
-            label: Mutex::new("main".to_string()),
+        .menu(tauri::Menu::new().add_item(tauri::CustomMenuItem::new("quit", "Quit")))
+        .on_menu_event(|event| {
+            if event.menu_item_id() == "quit" {
+                tokio::spawn(async move {
+                    let state = event.window().state::<AppState>();
+                    let saved_state = SavedState {
+                        count: state.count.lock().await.clone(),
+                        active: state.active.lock().await.clone(),
+                        windows: state.windows.lock().await.clone(),
+                    };
+                    let dir = path::app_data_dir(&tauri::Config::default()).unwrap();
+                    let path = dir.join("state.json");
+                    let _ = std::fs::write(
+                        path.clone(),
+                        serde_json::to_string(&saved_state).unwrap_or_default(),
+                    );
+                    println!("state saved to {:?}", path);
+                    // quit all
+                    std::process::exit(0);
+                });
+            }
         })
+        .manage(app_state)
         .invoke_handler(tauri::generate_handler![
             open_file_image,
             get_filenames_inner_zip,
             read_image_in_zip,
             subscribe_dir_notification,
+            open_new_window,
+            close_window,
+            open_new_tab,
+            open_dialog,
+            remove_tab,
+            change_active_tab,
+            request_restore_state,
             change_active_window,
             explore_path,
             show_devices,
             get_page_count,
             transfer_folder,
-            add_tab,
         ])
 }
