@@ -7,7 +7,7 @@ use crate::{
         file_path_transfer_server::FilePathTransfer, FilePathTransferRequest,
         FilePathTransferResponse,
     },
-    app::viewer::ActiveWindow,
+    service::app_state::{add_tab_state, AppState},
 };
 
 pub struct Transferer {
@@ -26,28 +26,20 @@ impl FilePathTransfer for Transferer {
         &self,
         request: Request<FilePathTransferRequest>,
     ) -> Result<Response<FilePathTransferResponse>, Status> {
-        let active = self.app.state::<ActiveWindow>();
-        active.label.lock().map_or_else(
-            |_| {
+        let state = self.app.state::<AppState>();
+        let label = state.active.lock().await.label.clone();
+        add_tab_state(&request.get_ref().path.clone(), &label, &state)
+            .await
+            .map_err(|_| Status::failed_precondition("system unavailable"))?;
+        let windows = state.windows.lock().await;
+        let window_state = windows.iter().find(|v| v.label == label).unwrap();
+        self.app
+            .emit_to(label.as_str(), "window-state-changed", window_state)
+            .unwrap_or_else(|_| {
                 self.app
-                    .emit_all("image-file-opened", request.get_ref().path.clone())
+                    .emit_all("window-state-changed", window_state)
                     .unwrap_or(())
-            },
-            |label| {
-                self.app
-                    .emit_to(
-                        label.as_str(),
-                        "image-file-opened",
-                        request.get_ref().path.clone(),
-                    )
-                    .unwrap_or_else(|_| {
-                        self.app
-                            .emit_all("image-file-opened", request.get_ref().path.clone())
-                            .unwrap_or(())
-                    })
-            },
-        );
-
+            });
         let response = FilePathTransferResponse { result: 5 };
         Ok(Response::new(response))
     }

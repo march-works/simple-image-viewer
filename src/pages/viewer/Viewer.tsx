@@ -1,39 +1,32 @@
-import { open } from '@tauri-apps/api/dialog';
 import { Tabs } from '../../components/Tab/Tabs';
 import { ViewerTab } from './ViewerTab';
-import { ImageExtensions } from '../../features/filepath/consts/images';
-import { CompressedExtensions } from '../../features/filepath/consts/compressed';
-import {
-  getFileNameWithoutExtension,
-  getParentDirectoryName,
-  getParentDirectoryPath,
-} from '../../features/FilePath/utils/converters';
 import { getMatches } from '@tauri-apps/api/cli';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { appWindow, WebviewWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api';
 import { createSignal, onCleanup, onMount } from 'solid-js';
-import { VideoExtensions } from '../../features/filepath/consts/videos';
-import {
-  isExecutableFile,
-  isCompressedFile,
-} from '../../features/filepath/utils/checkers';
 
 type TabState = {
   title: string;
   key: string;
   path: string;
-  initFilePath?: string;
-}[];
+  init_path?: string;
+};
+
+type WindowState = {
+  active?: {
+    key: string;
+  };
+  tabs: TabState[];
+};
 
 const Viewer = () => {
   const [activeKey, setActiveKey] = createSignal<string>();
-  const [panes, setPanes] = createSignal<TabState>([]);
-  let newTabIndex = 0;
+  const [panes, setPanes] = createSignal<TabState[]>([]);
   let unListenRef: UnlistenFn | undefined = undefined;
 
   const onChange = (newActiveKey: string) => {
-    setActiveKey(newActiveKey);
+    invoke('change_active_tab', { key: newActiveKey, label: appWindow.label });
   };
 
   const handleOnFocus = () => {
@@ -41,86 +34,37 @@ const Viewer = () => {
   };
 
   onMount(() => {
-    listen('image-file-opened', (event) => {
-      createNewTab(event.payload as string);
+    listen('window-state-changed', (event) => {
+      const { active, tabs } = event.payload as WindowState;
+      console.log('window-state-changed', event.payload);
+      setPanes(tabs);
+      setActiveKey(active?.key);
       appWindow.setFocus();
     }).then((unListen) => (unListenRef = unListen));
 
     window.addEventListener('focus', handleOnFocus, false);
     handleOnFocus();
 
+    invoke('request_restore_state', { label: appWindow.label });
+
     getMatches().then((matches) => {
       const filepath = matches.args.filepath.value;
       typeof filepath === 'string' &&
-        appWindow.label === 'main' &&
-        createNewTab(filepath);
+        invoke('open_new_tab', { path: filepath });
     });
   });
 
-  onCleanup(() => {
+  onCleanup(async () => {
     window.removeEventListener('focus', handleOnFocus, false);
     unListenRef && unListenRef();
   });
 
-  const createNewTab = (dir: string) => {
-    const newActiveKey = `newTab${newTabIndex++}`;
-    setPanes((prevPanes) => {
-      const newPanes = [...prevPanes];
-      const title = isExecutableFile(dir)
-        ? getParentDirectoryName(dir)
-        : getFileNameWithoutExtension(dir);
-      const path = isCompressedFile(dir) ? dir : getParentDirectoryPath(dir);
-      newPanes.push({
-        title: title,
-        key: newActiveKey,
-        path: path,
-        initFilePath: isExecutableFile(dir) ? dir : undefined,
-      });
-      return newPanes;
-    });
-    setActiveKey(newActiveKey);
-  };
-
   const add = async () => {
-    const dir = await open({
-      filters: [
-        {
-          name: 'File',
-          extensions: [
-            ...ImageExtensions,
-            ...VideoExtensions,
-            ...CompressedExtensions,
-          ],
-        },
-      ],
-    });
-    if (Array.isArray(dir)) {
-      return;
-    }
-    if (!dir) {
-      return;
-    }
-    createNewTab(dir);
+    invoke('open_dialog');
   };
 
   const remove = (targetKey: string) => {
-    let newActiveKey = activeKey();
-    let lastIndex = -1;
-    panes().forEach((pane, i) => {
-      if (pane.key === targetKey) {
-        lastIndex = i - 1;
-      }
-    });
-    const newPanes = panes().filter((pane) => pane.key !== targetKey);
-    if (newPanes.length && newActiveKey === targetKey) {
-      if (lastIndex >= 0) {
-        newActiveKey = newPanes[lastIndex].key;
-      } else {
-        newActiveKey = newPanes[0].key;
-      }
-    }
-    setPanes(() => newPanes);
-    setActiveKey(() => newActiveKey);
+    invoke('remove_tab', { key: targetKey, label: appWindow.label });
   };
 
   const openExplorer = () => {
@@ -139,7 +83,7 @@ const Viewer = () => {
           <ViewerTab
             isActiveTab={info.key === activeKey()}
             path={info.path}
-            initFilePath={info.initFilePath}
+            initFilePath={info.init_path}
           />
         )}
         handleOnClick={onChange}
