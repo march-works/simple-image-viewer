@@ -12,13 +12,13 @@ use crate::{
     app::{
         explorer::{explore_path, get_page_count, show_devices, transfer_folder},
         viewer::{
-            change_active_tab, change_active_window, close_window, get_filenames_inner_zip,
-            open_dialog, open_file_image, open_new_tab, open_new_window, read_image_in_zip,
-            remove_tab, request_restore_state, subscribe_dir_notification,
+            change_active_tab, change_active_window, get_filenames_inner_zip, open_dialog,
+            open_file_image, open_new_tab, open_new_window, read_image_in_zip, remove_tab,
+            request_restore_state, subscribe_dir_notification,
         },
     },
     grpc::{add_tab, new_window, server},
-    service::app_state::{ActiveWindow, AppState, WindowState},
+    service::app_state::{remove_window_state, ActiveWindow, AppState, WindowState},
 };
 
 fn get_running_count() -> i32 {
@@ -129,10 +129,16 @@ pub fn open_new_viewer() -> Builder<Wry> {
             if event.menu_item_id() == "quit" {
                 tokio::spawn(async move {
                     let state = event.window().state::<AppState>();
+                    let mut active = state.active.lock().await.clone();
+                    let mut windows = state.windows.lock().await.clone();
+                    if !windows.is_empty() {
+                        active.label = "label-0".to_string();
+                        windows[0].label = "label-0".to_string();
+                    }
                     let saved_state = SavedState {
                         count: *state.count.lock().await,
-                        active: state.active.lock().await.clone(),
-                        windows: state.windows.lock().await.clone(),
+                        active,
+                        windows,
                     };
                     let dir = path::app_data_dir(&tauri::Config::default()).unwrap();
                     let path = dir.join("state.json");
@@ -141,8 +147,16 @@ pub fn open_new_viewer() -> Builder<Wry> {
                         serde_json::to_string(&saved_state).unwrap_or_default(),
                     );
                     println!("state saved to {:?}", path);
-                    // quit all
                     std::process::exit(0);
+                });
+            }
+        })
+        .on_window_event(|event| {
+            if let tauri::WindowEvent::CloseRequested { .. } = event.event() {
+                tokio::spawn(async move {
+                    let state = event.window().state::<AppState>();
+                    let label = event.window().label().to_string();
+                    remove_window_state(label, state).await
                 });
             }
         })
@@ -153,7 +167,6 @@ pub fn open_new_viewer() -> Builder<Wry> {
             read_image_in_zip,
             subscribe_dir_notification,
             open_new_window,
-            close_window,
             open_new_tab,
             open_dialog,
             remove_tab,

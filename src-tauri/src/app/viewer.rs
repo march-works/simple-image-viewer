@@ -101,20 +101,6 @@ pub(crate) async fn open_new_window<'a>(
 }
 
 #[tauri::command]
-pub(crate) async fn close_window<'a>(
-    label: String,
-    state: State<'a, AppState>,
-) -> Result<(), String> {
-    let mut windows = state.windows.lock().await;
-    let index = (*windows)
-        .iter()
-        .position(|w| w.label == label)
-        .ok_or_else(|| "window not found".to_string())?;
-    (*windows).remove(index);
-    Ok(())
-}
-
-#[tauri::command]
 pub(crate) async fn open_new_tab<'a>(
     path: String,
     state: State<'a, AppState>,
