@@ -130,7 +130,7 @@ pub fn open_new_viewer() -> Builder<Wry> {
                 tokio::spawn(async move {
                     let state = event.window().state::<AppState>();
                     let saved_state = SavedState {
-                        count: state.count.lock().await.clone(),
+                        count: *state.count.lock().await,
                         active: state.active.lock().await.clone(),
                         windows: state.windows.lock().await.clone(),
                     };

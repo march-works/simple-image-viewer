@@ -46,11 +46,11 @@ const Viewer = () => {
     handleOnFocus();
 
     invoke('request_restore_state', { label: appWindow.label });
-    
+
     getMatches().then((matches) => {
       const filepath = matches.args.filepath.value;
       typeof filepath === 'string' &&
-        invoke('open_new_tab', {path: filepath});
+        invoke('open_new_tab', { path: filepath });
     });
   });
 
@@ -64,7 +64,7 @@ const Viewer = () => {
   };
 
   const remove = (targetKey: string) => {
-    invoke("remove_tab", { key: targetKey, label: appWindow.label });
+    invoke('remove_tab', { key: targetKey, label: appWindow.label });
   };
 
   const openExplorer = () => {

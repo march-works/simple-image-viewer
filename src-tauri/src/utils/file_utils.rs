@@ -61,30 +61,30 @@ pub(crate) fn is_compressed_file(path: &str) -> bool {
 }
 
 pub(crate) fn get_jpeg_extensions() -> Vec<String> {
-    vec!["jpg", "jpeg", "JPG", "JPEG", "jpe", "jfif", "pjpeg", "pjp"]
+    ["jpg", "jpeg", "JPG", "JPEG", "jpe", "jfif", "pjpeg", "pjp"]
         .iter()
         .map(|v| v.to_string())
         .collect()
 }
 
 pub(crate) fn get_png_extensions() -> Vec<String> {
-    vec!["png", "PNG"].iter().map(|v| v.to_string()).collect()
+    ["png", "PNG"].iter().map(|v| v.to_string()).collect()
 }
 
 pub(crate) fn get_gif_extensions() -> Vec<String> {
-    vec!["gif"].iter().map(|v| v.to_string()).collect()
+    ["gif"].iter().map(|v| v.to_string()).collect()
 }
 
 pub(crate) fn get_tiff_extensions() -> Vec<String> {
-    vec!["tif", "tiff"].iter().map(|v| v.to_string()).collect()
+    ["tif", "tiff"].iter().map(|v| v.to_string()).collect()
 }
 
 pub(crate) fn get_bmp_extensions() -> Vec<String> {
-    vec!["bmp", "dib"].iter().map(|v| v.to_string()).collect()
+    ["bmp", "dib"].iter().map(|v| v.to_string()).collect()
 }
 
 pub(crate) fn get_webp_extensions() -> Vec<String> {
-    vec!["webp"].iter().map(|v| v.to_string()).collect()
+    ["webp"].iter().map(|v| v.to_string()).collect()
 }
 
 pub(crate) fn get_image_extensions() -> Vec<String> {
@@ -99,14 +99,14 @@ pub(crate) fn get_image_extensions() -> Vec<String> {
 }
 
 pub(crate) fn get_video_extensions() -> Vec<String> {
-    vec!["mp4", "avi", "mov", "mkv", "wmv", "flv", "webm"]
+    ["mp4", "avi", "mov", "mkv", "wmv", "flv", "webm"]
         .iter()
         .map(|v| v.to_string())
         .collect()
 }
 
 pub(crate) fn get_compressed_extensions() -> Vec<String> {
-    vec!["zip", "tar", "gz", "bz2", "xz", "7z"]
+    ["zip", "tar", "gz", "bz2", "xz", "7z"]
         .iter()
         .map(|v| v.to_string())
         .collect()
