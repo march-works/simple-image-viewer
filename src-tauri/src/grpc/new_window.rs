@@ -1,24 +1,21 @@
-use std::ops::AddAssign;
-
-use tauri::{async_runtime::Mutex, AppHandle};
+use tauri::{AppHandle, Manager};
 use tonic::{Request, Response, Status};
 
-use crate::new_window::{
-    new_window_opened_client::NewWindowOpenedClient, new_window_opened_server::NewWindowOpened,
-    OpenNewWindowRequest, OpenNewWindowResponse,
+use crate::{
+    new_window::{
+        new_window_opened_client::NewWindowOpenedClient, new_window_opened_server::NewWindowOpened,
+        OpenNewWindowRequest, OpenNewWindowResponse,
+    },
+    service::app_state::{add_window_state, AppState},
 };
 
 pub struct Opener {
     app: AppHandle,
-    count: Mutex<i32>,
 }
 
 impl Opener {
     pub fn new(app: AppHandle) -> Self {
-        Opener {
-            app,
-            count: Mutex::new(0),
-        }
+        Opener { app }
     }
 }
 
@@ -28,16 +25,15 @@ impl NewWindowOpened for Opener {
         &self,
         _: Request<OpenNewWindowRequest>,
     ) -> Result<Response<OpenNewWindowResponse>, Status> {
-        tauri::WindowBuilder::new(
-            &self.app,
-            format!("label-{}", self.count.lock().await),
-            tauri::WindowUrl::App("index.html".into()),
-        )
-        .title("Simple Image Viewer")
-        .maximized(true)
-        .build()
-        .map_err(|_| Status::failed_precondition("system unavailable"))?;
-        self.count.lock().await.add_assign(1);
+        let state = self.app.state::<AppState>();
+        let label = add_window_state(&state)
+            .await
+            .map_err(|_| Status::failed_precondition("system unavailable"))?;
+        tauri::WindowBuilder::new(&self.app, label, tauri::WindowUrl::App("index.html".into()))
+            .title("Simple Image Viewer")
+            .maximized(true)
+            .build()
+            .map_err(|_| Status::failed_precondition("system unavailable"))?;
         let response = OpenNewWindowResponse { result: 3 };
         Ok(Response::new(response))
     }
