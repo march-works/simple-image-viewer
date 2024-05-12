@@ -54,7 +54,7 @@ const Viewer = () => {
     });
   });
 
-  onCleanup(() => {
+  onCleanup(async () => {
     window.removeEventListener('focus', handleOnFocus, false);
     unListenRef && unListenRef();
   });
