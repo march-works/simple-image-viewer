@@ -4,8 +4,8 @@ use std::{io::Read, path::Path};
 use tauri::{AppHandle, Manager, State, Window};
 
 use crate::service::app_state::{
-    add_tab_state, add_window_state, open_file_pick_dialog, remove_tab_state, ActiveTab,
-    ActiveWindow, AppState,
+    add_tab_state, add_window_state, find_key_in_tree, get_next_in_tree, get_prev_in_tree,
+    open_file_pick_dialog, remove_tab_state, ActiveTab, ActiveWindow, AppState, File,
 };
 
 #[tauri::command]
@@ -80,7 +80,6 @@ pub(crate) async fn change_active_window<'a>(
     *label = ActiveWindow {
         label: window.label().to_string(),
     };
-    println!("active window: {}", label.label);
     Ok(())
 }
 
@@ -91,7 +90,6 @@ pub(crate) async fn open_new_window<'a>(
     app: AppHandle,
 ) -> Result<(), String> {
     let label = add_window_state(&state).await?;
-    println!("label: {}", label);
     if let Some(path) = &path {
         let window_state = add_tab_state(path, &label, &state).await?;
         app.emit_to(&label, "window-state-changed", &window_state)
@@ -170,5 +168,117 @@ pub(crate) async fn request_restore_state<'a>(
         .ok_or_else(|| "window not found".to_string())?;
     app.emit_to(&label, "window-state-changed", window_state.clone())
         .map_err(|_| "failed to emit window state".to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub(crate) async fn request_restore_tab_state<'a>(
+    key: String,
+    label: String,
+    state: State<'a, AppState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    let mut windows = state.windows.lock().await;
+    let window_state = (*windows)
+        .iter_mut()
+        .find(|w| w.label == label)
+        .ok_or_else(|| "window not found".to_string())?;
+    let tab_state = window_state
+        .tabs
+        .iter_mut()
+        .find(|t| t.key == key)
+        .ok_or_else(|| "tab not found".to_string())?;
+    app.emit_to(&label, "tab-state-changed", tab_state.clone())
+        .map_err(|_| "failed to emit window state".to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub(crate) async fn change_viewing(
+    tab_key: String,
+    key: String,
+    label: String,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    let mut windows = state.windows.lock().await;
+    let window_state = (*windows)
+        .iter_mut()
+        .find(|w| w.label == label)
+        .ok_or_else(|| "window not found".to_string())?;
+    let index = window_state
+        .tabs
+        .iter()
+        .position(|t| t.key == tab_key)
+        .ok_or_else(|| "tab not found".to_string())?;
+    let tree = &window_state.tabs[index].tree;
+    let viewing = find_key_in_tree(tree, &key);
+    window_state.tabs[index].viewing = viewing;
+    app.emit_to(
+        &label,
+        "tab-state-changed",
+        window_state.tabs[index].clone(),
+    )
+    .map_err(|_| "failed to emit window state".to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub(crate) async fn move_forward(
+    label: String,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    let mut windows = state.windows.lock().await;
+    let window_state = (*windows)
+        .iter_mut()
+        .find(|w| w.label == label)
+        .ok_or_else(|| "window not found".to_string())?;
+    let tab_state = window_state
+        .tabs
+        .iter_mut()
+        .find(|t| t.key == window_state.active.as_ref().unwrap().key)
+        .ok_or_else(|| "tab not found".to_string())?;
+    let old_viewing = tab_state.viewing.clone();
+    let viewing = if let Some(File { key, .. }) = old_viewing {
+        get_next_in_tree(&key, &tab_state.tree)
+    } else {
+        None
+    };
+    if viewing.is_some() {
+        tab_state.viewing = viewing;
+        app.emit_to(&label, "tab-state-changed", tab_state.clone())
+            .map_err(|_| "failed to emit window state".to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub(crate) async fn move_backward(
+    label: String,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    let mut windows = state.windows.lock().await;
+    let window_state = (*windows)
+        .iter_mut()
+        .find(|w| w.label == label)
+        .ok_or_else(|| "window not found".to_string())?;
+    let tab_state = window_state
+        .tabs
+        .iter_mut()
+        .find(|t| t.key == window_state.active.as_ref().unwrap().key)
+        .ok_or_else(|| "tab not found".to_string())?;
+    let old_viewing = tab_state.viewing.clone();
+    let viewing = if let Some(File { key, .. }) = old_viewing {
+        get_prev_in_tree(&key, &tab_state.tree)
+    } else {
+        None
+    };
+    if viewing.is_some() {
+        tab_state.viewing = viewing;
+        app.emit_to(&label, "tab-state-changed", tab_state.clone())
+            .map_err(|_| "failed to emit window state".to_string())?;
+    }
     Ok(())
 }
