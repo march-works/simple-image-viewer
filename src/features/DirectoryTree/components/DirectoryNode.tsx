@@ -1,4 +1,4 @@
-import { Component, createMemo, createSignal, For, onCleanup, Show } from 'solid-js';
+import { Component, createMemo, createSignal, For, Show } from 'solid-js';
 import { match, P } from 'ts-pattern';
 import { ImageNode } from './ImageNode';
 import { NodeBaseStyle } from './NodeBaseStyle';
@@ -26,9 +26,7 @@ export const DirectoryNode: Component<Props> = (props) => {
   });
   return (
     <div class="w-full">
-      <NodeBaseStyle
-        onClick={() => setOpen((prev) => !prev)}
-      >
+      <NodeBaseStyle onClick={() => setOpen((prev) => !prev)}>
         <Show when={open()} fallback={<FaSolidCaretRight />}>
           <FaSolidCaretDown />
         </Show>
@@ -42,39 +40,37 @@ export const DirectoryNode: Component<Props> = (props) => {
           <For each={tree().children}>
             {(node) =>
               match(node)
-              .with({ Directory: P.any }, (nd) => (
-                <DirectoryNode
-                  tree={nd.Directory}
-                  viewing={props.viewing}
-                  onClick={props.onClick}
-                />
-              ))
-              .with({ File: { file_type: 'Image' } }, (nd) => (
-                <ImageNode
-                  node={nd.File}
-                  isSelected={nd.File.key === props.viewing?.key}
-                  onClick={() => props.onClick(nd.File)}
-                />
-              ))
-              .with({ File: { file_type: 'Video' }, }, (nd) => (
-                <VideoNode
-                  node={nd.File}
-                  isSelected={nd.File.key === props.viewing?.key}
-                  onClick={() => props.onClick(nd.File)}
-                />
-              ))
-              .with({ File: { file_type: 'Zip' } }, (nd) => (
-                <ZipNode
-                  node={nd.File}
-                  isSelected={nd.File.key === props.viewing?.key}
-                  onClick={() => props.onClick(nd.File)}
-                />
-              ))
-              .with({ File: P.select() }, (file) => (
-                undefined
-              ))
-              .exhaustive()
-              }
+                .with({ Directory: P.any }, (nd) => (
+                  <DirectoryNode
+                    tree={nd.Directory}
+                    viewing={props.viewing}
+                    onClick={props.onClick}
+                  />
+                ))
+                .with({ File: { file_type: 'Image' } }, (nd) => (
+                  <ImageNode
+                    node={nd.File}
+                    isSelected={nd.File.key === props.viewing?.key}
+                    onClick={() => props.onClick(nd.File)}
+                  />
+                ))
+                .with({ File: { file_type: 'Video' } }, (nd) => (
+                  <VideoNode
+                    node={nd.File}
+                    isSelected={nd.File.key === props.viewing?.key}
+                    onClick={() => props.onClick(nd.File)}
+                  />
+                ))
+                .with({ File: { file_type: 'Zip' } }, (nd) => (
+                  <ZipNode
+                    node={nd.File}
+                    isSelected={nd.File.key === props.viewing?.key}
+                    onClick={() => props.onClick(nd.File)}
+                  />
+                ))
+                .with({ File: P.select() }, () => undefined)
+                .exhaustive()
+            }
           </For>
         </div>
       </Show>

@@ -36,7 +36,7 @@ export const DirectoryList: Component<Props> = (props) => {
                 onClick={() => props.onClick(nd.File)}
               />
             ))
-            .with({ File: { file_type: 'Video' }, }, (nd) => (
+            .with({ File: { file_type: 'Video' } }, (nd) => (
               <VideoNode
                 node={nd.File}
                 isSelected={nd.File.key === props.viewing?.key}
@@ -50,9 +50,7 @@ export const DirectoryList: Component<Props> = (props) => {
                 onClick={() => props.onClick(nd.File)}
               />
             ))
-            .with({ File: P.select() }, (file) => (
-              undefined
-            ))
+            .with({ File: P.select() }, () => undefined)
             .exhaustive()
         }
       </For>

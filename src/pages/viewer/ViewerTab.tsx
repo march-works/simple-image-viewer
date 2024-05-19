@@ -1,10 +1,5 @@
 import { invoke } from '@tauri-apps/api';
-import {
-  Component,
-  createSignal,
-  onCleanup,
-  onMount,
-} from 'solid-js';
+import { Component, createSignal, onCleanup, onMount } from 'solid-js';
 import { PathSelection } from '../../features/DirectoryTree/routes/PathSelection';
 import { ImageCanvas } from '../../features/Image/ImageCanvas';
 import { appWindow } from '@tauri-apps/api/window';
@@ -23,11 +18,13 @@ export type Directory = {
   children: FileTree[];
 };
 
-export type FileTree = {
-  File: File;
-} | {
-  Directory: Directory;
-}
+export type FileTree =
+  | {
+      File: File;
+    }
+  | {
+      Directory: Directory;
+    };
 
 export type TabState = {
   title: string;
@@ -54,7 +51,7 @@ export const ViewerTab: Component<Props> = (props) => {
   };
 
   const moveBackward = () => {
-    invoke('move_backward', { label: appWindow.label});
+    invoke('move_backward', { label: appWindow.label });
   };
 
   const handleOnKeyDown = (event: KeyboardEvent) => {
@@ -80,7 +77,10 @@ export const ViewerTab: Component<Props> = (props) => {
     }).then((unListen) => (unListenRef = unListen));
 
     invoke('subscribe_dir_notification', { filepath: props.path });
-    invoke('request_restore_tab_state', { label: appWindow.label, key: props.tabKey });
+    invoke('request_restore_tab_state', {
+      label: appWindow.label,
+      key: props.tabKey,
+    });
     // listen('directory-tree-changed', (event) => {
     //   if (event.payload === props.path) readDirAndSetTree();
     // }).then((unListen) => (unListenRef = unListen));
@@ -97,7 +97,11 @@ export const ViewerTab: Component<Props> = (props) => {
   });
 
   const changeViewing = (tabKey: string, file: File) => {
-    invoke('change_viewing', { tabKey: tabKey, key: file.key, label: appWindow.label });
+    invoke('change_viewing', {
+      tabKey: tabKey,
+      key: file.key,
+      label: appWindow.label,
+    });
   };
 
   return (

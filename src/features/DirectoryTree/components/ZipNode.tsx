@@ -27,9 +27,7 @@ export const ZipNode: Component<Props> = (props) => {
       class="pl-3"
       ref={nodeRef}
       isSelected={props.isSelected}
-      onClick={() =>
-        props.onClick && props.onClick()
-      }
+      onClick={() => props.onClick && props.onClick()}
     >
       <FaSolidImage />
       <div class="hidden lg:block">{props.node.name}</div>

@@ -104,11 +104,12 @@ export const ImageCanvas: Component<Props> = (props) => {
 
   const [data] = createResource(
     () => props.viewing,
-    () => match(props.viewing?.file_type)
-      .with('Image', (_) => convertToLocalPath(props.viewing!))
-      .with('Video', (_) => convertToLocalPath(props.viewing!))
-      .with('Zip', (_) => readImageInZip(props.viewing!))
-      .otherwise(() => '')
+    () =>
+      match(props.viewing?.file_type)
+        .with('Image', (_) => convertToLocalPath(props.viewing!))
+        .with('Video', (_) => convertToLocalPath(props.viewing!))
+        .with('Zip', (_) => readImageInZip(props.viewing!))
+        .otherwise(() => '')
   );
 
   createEffect(
@@ -176,7 +177,8 @@ export const ImageCanvas: Component<Props> = (props) => {
         </div>
         <Show
           when={
-            props.viewing?.file_type === 'Image' || props.viewing?.file_type === 'Zip'
+            props.viewing?.file_type === 'Image' ||
+            props.viewing?.file_type === 'Zip'
           }
         >
           <div class="fixed bottom-3 left-0 w-full flex justify-center gap-10">

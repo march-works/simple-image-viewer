@@ -267,7 +267,7 @@ pub(crate) fn find_key_in_tree(tree: &Vec<FileTree>, key: &String) -> Option<Fil
                 name: _,
                 children,
             }) => {
-                let file = find_key_in_tree(&children, key);
+                let file = find_key_in_tree(children, key);
                 if file.is_some() {
                     return file;
                 }
@@ -290,7 +290,7 @@ pub(crate) fn find_path_in_tree(tree: &Vec<FileTree>, path: &String) -> Option<F
                 name: _,
                 children,
             }) => {
-                let file = find_key_in_tree(&children, path);
+                let file = find_key_in_tree(children, path);
                 if file.is_some() {
                     return file;
                 }
@@ -305,31 +305,35 @@ pub(crate) fn get_next_in_tree(viewing: &String, tree: &Vec<FileTree>) -> Option
         FileTree::File(_) => true,
         _ => false,
     });
-    let files: Vec<_> = files.iter().map(|v| match v {
-        FileTree::File(file) => file.clone(),
-        _ => File {
-            key: "".to_string(),
-            file_type: "".to_string(),
-            path: "".to_string(),
-            name: "".to_string(),
-        },
-    }).collect();
-    let dirs: Vec<_> = dirs.iter().map(|v| match v {
-        FileTree::Directory(dir) => dir.clone(),
-        _ => Directory {
-            path: "".to_string(),
-            name: "".to_string(),
-            children: vec![],
-        },
-    }).collect();
-    let idx = (&files).iter().position(|v| {
-        v.key == *viewing
-    });
+    let files: Vec<_> = files
+        .iter()
+        .map(|v| match v {
+            FileTree::File(file) => file.clone(),
+            _ => File {
+                key: "".to_string(),
+                file_type: "".to_string(),
+                path: "".to_string(),
+                name: "".to_string(),
+            },
+        })
+        .collect();
+    let dirs: Vec<_> = dirs
+        .iter()
+        .map(|v| match v {
+            FileTree::Directory(dir) => dir.clone(),
+            _ => Directory {
+                path: "".to_string(),
+                name: "".to_string(),
+                children: vec![],
+            },
+        })
+        .collect();
+    let idx = files.iter().position(|v| v.key == *viewing);
     let length = files.len();
     if idx.is_some() {
         let idx = idx.unwrap();
         let next_idx = (idx + 1) % length;
-        return files.get(next_idx).map(|v| v.clone());
+        return files.get(next_idx).cloned();
     }
 
     for dir in dirs {
@@ -346,31 +350,35 @@ pub(crate) fn get_prev_in_tree(viewing: &String, tree: &Vec<FileTree>) -> Option
         FileTree::File(_) => true,
         _ => false,
     });
-    let files: Vec<_> = files.iter().map(|v| match v {
-        FileTree::File(file) => file.clone(),
-        _ => File {
-            key: "".to_string(),
-            file_type: "".to_string(),
-            path: "".to_string(),
-            name: "".to_string(),
-        },
-    }).collect();
-    let dirs: Vec<_> = dirs.iter().map(|v| match v {
-        FileTree::Directory(dir) => dir.clone(),
-        _ => Directory {
-            path: "".to_string(),
-            name: "".to_string(),
-            children: vec![],
-        },
-    }).collect();
-    let idx = (&files).iter().position(|v| {
-        v.key == *viewing
-    });
+    let files: Vec<_> = files
+        .iter()
+        .map(|v| match v {
+            FileTree::File(file) => file.clone(),
+            _ => File {
+                key: "".to_string(),
+                file_type: "".to_string(),
+                path: "".to_string(),
+                name: "".to_string(),
+            },
+        })
+        .collect();
+    let dirs: Vec<_> = dirs
+        .iter()
+        .map(|v| match v {
+            FileTree::Directory(dir) => dir.clone(),
+            _ => Directory {
+                path: "".to_string(),
+                name: "".to_string(),
+                children: vec![],
+            },
+        })
+        .collect();
+    let idx = files.iter().position(|v| v.key == *viewing);
     let length = files.len();
     if idx.is_some() {
         let idx = idx.unwrap();
         let next_idx = (idx + length - 1) % length;
-        return files.get(next_idx).map(|v| v.clone());
+        return files.get(next_idx).cloned();
     }
 
     for dir in dirs {

@@ -15,7 +15,7 @@ use crate::{
             change_active_tab, change_active_window, change_viewing, get_filenames_inner_zip,
             move_backward, move_forward, open_dialog, open_file_image, open_new_tab,
             open_new_window, read_image_in_zip, remove_tab, request_restore_state,
-            subscribe_dir_notification, request_restore_tab_state,
+            request_restore_tab_state, subscribe_dir_notification,
         },
     },
     grpc::{add_tab, new_window, server},
