@@ -1,16 +1,16 @@
 import { Component, createEffect } from 'solid-js';
-import { Zip } from '../types/DirectoryTree';
+import { File } from '../../../pages/viewer/ViewerTab';
 import { NodeBaseStyle } from './NodeBaseStyle';
 import { FaSolidImage } from 'solid-icons/fa';
 
 type Props = {
-  node: Zip;
+  node: File;
   isSelected: boolean;
-  onClick?: (path: string) => void;
+  onClick?: () => void;
 };
 
 export const ZipNode: Component<Props> = (props) => {
-  let nodeRef: HTMLDivElement | undefined = undefined;
+  let nodeRef!: HTMLDivElement;
 
   createEffect(() => {
     props.isSelected &&
@@ -27,9 +27,7 @@ export const ZipNode: Component<Props> = (props) => {
       class="pl-3"
       ref={nodeRef}
       isSelected={props.isSelected}
-      onClick={() =>
-        props.onClick && props.onClick(props.node.path + props.node.name)
-      }
+      onClick={() => props.onClick && props.onClick()}
     >
       <FaSolidImage />
       <div class="hidden lg:block">{props.node.name}</div>

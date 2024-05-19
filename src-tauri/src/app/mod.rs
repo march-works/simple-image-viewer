@@ -12,9 +12,10 @@ use crate::{
     app::{
         explorer::{explore_path, get_page_count, show_devices, transfer_folder},
         viewer::{
-            change_active_tab, change_active_window, get_filenames_inner_zip, open_dialog,
-            open_file_image, open_new_tab, open_new_window, read_image_in_zip, remove_tab,
-            request_restore_state, subscribe_dir_notification,
+            change_active_tab, change_active_window, change_viewing, get_filenames_inner_zip,
+            move_backward, move_forward, open_dialog, open_file_image, open_new_tab,
+            open_new_window, read_image_in_zip, remove_tab, request_restore_state,
+            request_restore_tab_state, subscribe_dir_notification,
         },
     },
     grpc::{add_tab, new_window, server},
@@ -177,5 +178,9 @@ pub fn open_new_viewer() -> Builder<Wry> {
             show_devices,
             get_page_count,
             transfer_folder,
+            change_viewing,
+            move_forward,
+            move_backward,
+            request_restore_tab_state,
         ])
 }
