@@ -183,7 +183,7 @@ pub(crate) async fn request_restore_tab_state<'a>(
         .iter_mut()
         .find(|w| w.label == label)
         .ok_or_else(|| "window not found".to_string())?;
-    let tab_state = (*window_state)
+    let tab_state = window_state
         .tabs
         .iter_mut()
         .find(|t| t.key == key)
@@ -234,7 +234,7 @@ pub(crate) async fn move_forward(
         .iter_mut()
         .find(|w| w.label == label)
         .ok_or_else(|| "window not found".to_string())?;
-    let tab_state = (*window_state)
+    let tab_state = window_state
         .tabs
         .iter_mut()
         .find(|t| t.key == window_state.active.as_ref().unwrap().key)
@@ -264,7 +264,7 @@ pub(crate) async fn move_backward(
         .iter_mut()
         .find(|w| w.label == label)
         .ok_or_else(|| "window not found".to_string())?;
-    let tab_state = (*window_state)
+    let tab_state = window_state
         .tabs
         .iter_mut()
         .find(|t| t.key == window_state.active.as_ref().unwrap().key)
