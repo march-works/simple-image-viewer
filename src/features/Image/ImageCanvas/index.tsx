@@ -12,12 +12,8 @@ import {
   Switch,
 } from 'solid-js';
 import { match } from 'ts-pattern';
-import {
-  Image,
-  Zip,
-  File,
-  Video,
-} from '../../DirectoryTree/types/DirectoryTree';
+// FIXME
+import { File } from '../../../pages/viewer/ViewerTab';
 import { HiSolidChevronLeft, HiSolidChevronRight } from 'solid-icons/hi';
 import { AiOutlineZoomIn, AiOutlineZoomOut } from 'solid-icons/ai';
 import 'video.js/dist/video-js.css';
@@ -30,7 +26,6 @@ type Props = {
 };
 
 export const ImageCanvas: Component<Props> = (props) => {
-  // const [data, setData] = createSignal<Pick<File, 'type'> & { data: string }>();
   const [isDragging, setIsDragging] = createSignal(false);
   const [initialPosition, setInitialPosition] = createSignal({ x: 0, y: 0 });
   const [imageScale, setImageScale] = createSignal<number>(1);
@@ -74,11 +69,9 @@ export const ImageCanvas: Component<Props> = (props) => {
     setPosition({ x: 0, y: 0 });
   };
 
-  const convertToLocalPath = async (file: Image | Video) => {
-    return convertFileSrc(file.path);
-  };
+  const convertToLocalPath = async (file: File) => convertFileSrc(file.path);
 
-  const readImageInZip = async (file: Zip) => {
+  const readImageInZip = async (file: File) => {
     return invoke<string>('read_image_in_zip', {
       path: file.path,
       filename: file.name,
@@ -110,13 +103,12 @@ export const ImageCanvas: Component<Props> = (props) => {
   };
 
   const [data] = createResource(
-    () => ({ ...props }),
-    () =>
-      match(props.viewing)
-        .with({ type: 'Image' }, (file) => convertToLocalPath(file))
-        .with({ type: 'Video' }, (file) => convertToLocalPath(file))
-        .with({ type: 'Zip' }, (file) => readImageInZip(file))
-        .otherwise(() => undefined)
+    () => props.viewing,
+    () => match(props.viewing?.file_type)
+      .with('Image', (_) => convertToLocalPath(props.viewing!))
+      .with('Video', (_) => convertToLocalPath(props.viewing!))
+      .with('Zip', (_) => readImageInZip(props.viewing!))
+      .otherwise(() => '')
   );
 
   createEffect(
@@ -144,7 +136,7 @@ export const ImageCanvas: Component<Props> = (props) => {
           onWheel={handleWheel}
         >
           <Switch>
-            <Match when={props.viewing?.type === 'Image'}>
+            <Match when={props.viewing?.file_type === 'Image'}>
               <img
                 class="w-full h-full object-contain"
                 src={data()}
@@ -158,7 +150,7 @@ export const ImageCanvas: Component<Props> = (props) => {
                 }}
               />
             </Match>
-            <Match when={props.viewing?.type === 'Video'}>
+            <Match when={props.viewing?.file_type === 'Video'}>
               <video
                 class="video-js vjs-theme-fantasy w-full h-full object-contain"
                 controls
@@ -166,7 +158,7 @@ export const ImageCanvas: Component<Props> = (props) => {
                 src={data()}
               />
             </Match>
-            <Match when={props.viewing?.type === 'Zip'}>
+            <Match when={props.viewing?.file_type === 'Zip'}>
               <img
                 class="w-full h-full object-contain"
                 src={`data:image/jpeg;base64,${data()}`}
@@ -184,7 +176,7 @@ export const ImageCanvas: Component<Props> = (props) => {
         </div>
         <Show
           when={
-            props.viewing?.type === 'Image' || props.viewing?.type === 'Zip'
+            props.viewing?.file_type === 'Image' || props.viewing?.file_type === 'Zip'
           }
         >
           <div class="fixed bottom-3 left-0 w-full flex justify-center gap-10">
