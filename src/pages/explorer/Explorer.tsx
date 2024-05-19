@@ -137,8 +137,6 @@ const Explorer = () => {
               <Folder
                 thumb={item}
                 onMarkedAsRead={(path) => {
-                  console.log(path);
-                  console.log(transferPath());
                   const to = transferPath();
                   if (!to) {
                     return;

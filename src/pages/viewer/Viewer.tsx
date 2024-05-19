@@ -1,17 +1,10 @@
 import { Tabs } from '../../components/Tab/Tabs';
-import { ViewerTab } from './ViewerTab';
+import { ViewerTab, TabState } from './ViewerTab';
 import { getMatches } from '@tauri-apps/api/cli';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { appWindow, WebviewWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api';
 import { createSignal, onCleanup, onMount } from 'solid-js';
-
-type TabState = {
-  title: string;
-  key: string;
-  path: string;
-  init_path?: string;
-};
 
 type WindowState = {
   active?: {
@@ -36,7 +29,6 @@ const Viewer = () => {
   onMount(() => {
     listen('window-state-changed', (event) => {
       const { active, tabs } = event.payload as WindowState;
-      console.log('window-state-changed', event.payload);
       setPanes(tabs);
       setActiveKey(active?.key);
       appWindow.setFocus();
@@ -83,7 +75,7 @@ const Viewer = () => {
           <ViewerTab
             isActiveTab={info.key === activeKey()}
             path={info.path}
-            initFilePath={info.init_path}
+            tabKey={info.key}
           />
         )}
         handleOnClick={onChange}
