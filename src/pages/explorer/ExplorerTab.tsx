@@ -1,14 +1,13 @@
-import { Component, For, createSignal, onCleanup, onMount } from "solid-js";
-import { Pagination } from "../../components/Pagination/Pagination";
-import { Folder } from "../../features/Folder/routes/Folder";
-import { Thumbnail } from "../../features/Folder/types/Thumbnail";
-import { invoke } from "@tauri-apps/api";
+import { Component, For, createSignal, onCleanup, onMount } from 'solid-js';
+import { Pagination } from '../../components/Pagination/Pagination';
+import { Folder } from '../../features/Folder/routes/Folder';
+import { Thumbnail } from '../../features/Folder/types/Thumbnail';
+import { invoke } from '@tauri-apps/api';
 import { open } from '@tauri-apps/api/dialog';
-import { FaSolidFolderOpen } from "solid-icons/fa";
-import { RiDocumentFolderTransferFill } from "solid-icons/ri";
-import { UnlistenFn, listen } from "@tauri-apps/api/event";
-import { appWindow } from "@tauri-apps/api/window";
-
+import { FaSolidFolderOpen } from 'solid-icons/fa';
+import { RiDocumentFolderTransferFill } from 'solid-icons/ri';
+import { UnlistenFn, listen } from '@tauri-apps/api/event';
+import { appWindow } from '@tauri-apps/api/window';
 
 export type TabState = {
   title: string;
@@ -35,7 +34,8 @@ export const ExplorerTab: Component<Props> = (props) => {
 
   onMount(async () => {
     listen('explorer-tab-state-changed', (event) => {
-      const { key, transferPath, page, end, folders } = event.payload as TabState;
+      const { key, transferPath, page, end, folders } =
+        event.payload as TabState;
       if (key !== props.tabKey) return;
       console.log(event.payload);
       setPage(page);
@@ -49,7 +49,7 @@ export const ExplorerTab: Component<Props> = (props) => {
       key: props.tabKey,
     });
   });
-  
+
   onCleanup(() => {
     unListenRef && unListenRef();
   });
@@ -73,7 +73,11 @@ export const ExplorerTab: Component<Props> = (props) => {
         path: thumb.thumbpath,
       });
     } else {
-      invoke('change_explorer_path', { path: thumb.path, label: appWindow.label, key: props.tabKey })
+      invoke('change_explorer_path', {
+        path: thumb.path,
+        label: appWindow.label,
+        key: props.tabKey,
+      });
     }
   };
 
@@ -89,24 +93,40 @@ export const ExplorerTab: Component<Props> = (props) => {
   };
 
   const movePage = (page: number) => {
-    invoke('change_explorer_page', { label: appWindow.label, key: props.tabKey, page });
-  }
+    invoke('change_explorer_page', {
+      label: appWindow.label,
+      key: props.tabKey,
+      page,
+    });
+  };
 
   const moveForward = () => {
-    invoke('move_explorer_forward', { label: appWindow.label, key: props.tabKey});
-  }
+    invoke('move_explorer_forward', {
+      label: appWindow.label,
+      key: props.tabKey,
+    });
+  };
 
   const moveBackward = () => {
-    invoke('move_explorer_backward', { label: appWindow.label, key: props.tabKey});
-  }
+    invoke('move_explorer_backward', {
+      label: appWindow.label,
+      key: props.tabKey,
+    });
+  };
 
   const moveFirst = () => {
-    invoke('move_explorer_to_start', { label: appWindow.label, key: props.tabKey});
-  }
+    invoke('move_explorer_to_start', {
+      label: appWindow.label,
+      key: props.tabKey,
+    });
+  };
 
   const moveLast = () => {
-    invoke('move_explorer_to_end', { label: appWindow.label, key: props.tabKey});
-  }
+    invoke('move_explorer_to_end', {
+      label: appWindow.label,
+      key: props.tabKey,
+    });
+  };
 
   return (
     <div class="h-full flex flex-col overflow-hidden">
@@ -127,9 +147,7 @@ export const ExplorerTab: Component<Props> = (props) => {
           </span>
         </div>
       </div>
-      <div
-        class="relative flex flex-row flex-wrap p-5 gap-5 overflow-auto"
-      >
+      <div class="relative flex flex-row flex-wrap p-5 gap-5 overflow-auto">
         <For each={folders()}>
           {(item) => (
             <Folder
@@ -159,4 +177,4 @@ export const ExplorerTab: Component<Props> = (props) => {
       </div>
     </div>
   );
-}
+};

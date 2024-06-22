@@ -33,7 +33,10 @@ const Explorer = () => {
   });
 
   const onChange = (newActiveKey: string) => {
-    invoke('change_active_explorer_tab', { key: newActiveKey, label: appWindow.label });
+    invoke('change_active_explorer_tab', {
+      key: newActiveKey,
+      label: appWindow.label,
+    });
   };
 
   const add = async () => {

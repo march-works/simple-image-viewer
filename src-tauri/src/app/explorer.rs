@@ -5,7 +5,8 @@ use tauri::{AppHandle, Manager, State};
 use tokio_stream::StreamExt;
 
 use crate::service::app_state::{
-    add_explorer_state, add_explorer_tab_state, explore_path, get_page_count, remove_explorer_tab_state, reset_explorer_tab_state, ActiveTab, AppState
+    add_explorer_state, add_explorer_tab_state, explore_path, get_page_count,
+    remove_explorer_tab_state, reset_explorer_tab_state, ActiveTab, AppState,
 };
 
 pub struct StreamActivation(bool);
@@ -206,7 +207,6 @@ pub(crate) async fn change_explorer_page(
     .map_err(|_| "failed to emit explorer state".to_string())?;
     Ok(())
 }
-
 
 #[tauri::command]
 pub(crate) async fn reset_explorer_tab(

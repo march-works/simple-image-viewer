@@ -19,7 +19,10 @@ const Viewer = () => {
   let unListenRef: UnlistenFn | undefined = undefined;
 
   const onChange = (newActiveKey: string) => {
-    invoke('change_active_viewer_tab', { key: newActiveKey, label: appWindow.label });
+    invoke('change_active_viewer_tab', {
+      key: newActiveKey,
+      label: appWindow.label,
+    });
   };
 
   const handleOnFocus = () => {
