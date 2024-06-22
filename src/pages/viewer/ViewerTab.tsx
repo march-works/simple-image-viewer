@@ -69,7 +69,7 @@ export const ViewerTab: Component<Props> = (props) => {
   };
 
   onMount(() => {
-    listen('tab-state-changed', (event) => {
+    listen('viewer-tab-state-changed', (event) => {
       const { key, viewing, tree } = event.payload as TabState;
       if (key !== props.tabKey) return;
       setViewing(viewing);
@@ -77,7 +77,7 @@ export const ViewerTab: Component<Props> = (props) => {
     }).then((unListen) => (unListenRef = unListen));
 
     invoke('subscribe_dir_notification', { filepath: props.path });
-    invoke('request_restore_tab_state', {
+    invoke('request_restore_viewer_tab_state', {
       label: appWindow.label,
       key: props.tabKey,
     });

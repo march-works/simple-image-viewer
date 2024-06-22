@@ -10,16 +10,26 @@ use tauri::{api::path, async_runtime::Mutex, utils::platform::current_exe, Build
 use crate::{
     // app::explorer::open_explorer,
     app::{
-        explorer::{explore_path, get_page_count, show_devices, transfer_folder},
+        explorer::{
+            change_active_explorer_tab, change_explorer_page, change_explorer_path,
+            change_explorer_transfer_path, move_explorer_backward, move_explorer_forward,
+            move_explorer_to_end, move_explorer_to_start, open_new_explorer, open_new_explorer_tab,
+            remove_explorer_tab, request_restore_explorer_state,
+            request_restore_explorer_tab_state, reset_explorer_tab, transfer_folder,
+        },
         viewer::{
-            change_active_tab, change_active_window, change_viewing, get_filenames_inner_zip,
-            move_backward, move_forward, open_dialog, open_file_image, open_new_tab,
-            open_new_window, read_image_in_zip, remove_tab, request_restore_state,
-            request_restore_tab_state, subscribe_dir_notification,
+            change_active_viewer, change_active_viewer_tab, change_viewing,
+            get_filenames_inner_zip, move_backward, move_forward, open_file_image,
+            open_image_dialog, open_new_viewer, open_new_viewer_tab, read_image_in_zip,
+            remove_viewer_tab, request_restore_viewer_state, request_restore_viewer_tab_state,
+            subscribe_dir_notification,
         },
     },
     grpc::{add_tab, new_window, server},
-    service::app_state::{remove_window_state, ActiveWindow, AppState, WindowState},
+    service::app_state::{
+        remove_explorer_state, remove_viewer_state, ActiveViewer, AppState, ExplorerState,
+        ViewerState,
+    },
 };
 
 fn get_running_count() -> i32 {
@@ -51,28 +61,30 @@ fn get_running_count() -> i32 {
 #[derive(serde::Serialize, serde::Deserialize)]
 struct SavedState {
     count: i32,
-    active: ActiveWindow,
-    windows: Vec<WindowState>,
+    active: ActiveViewer,
+    viewers: Vec<ViewerState>,
+    explorers: Vec<ExplorerState>,
 }
 
 impl Default for SavedState {
     fn default() -> Self {
         SavedState {
             count: 1,
-            active: ActiveWindow {
+            active: ActiveViewer {
                 label: "label-0".to_string(),
             },
-            windows: vec![WindowState {
+            viewers: vec![ViewerState {
                 label: "label-0".to_string(),
                 count: 0,
                 active: None,
                 tabs: vec![],
             }],
+            explorers: vec![],
         }
     }
 }
 
-pub fn open_new_viewer() -> Builder<Wry> {
+pub fn create_viewer() -> Builder<Wry> {
     let save_dir = path::app_data_dir(&tauri::Config::default()).unwrap();
     let save_path = save_dir.join("state.json");
     let saved_state = if let Ok(data) = std::fs::read_to_string(save_path.clone()) {
@@ -83,7 +95,8 @@ pub fn open_new_viewer() -> Builder<Wry> {
     let app_state = AppState {
         count: Mutex::new(saved_state.count),
         active: Mutex::new(saved_state.active),
-        windows: Mutex::new(saved_state.windows.clone()),
+        viewers: Mutex::new(saved_state.viewers.clone()),
+        explorers: Mutex::new(saved_state.explorers.clone()),
     };
     tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::default().build())
@@ -107,7 +120,7 @@ pub fn open_new_viewer() -> Builder<Wry> {
                 }
             } else {
                 tokio::spawn(server::run_server(app.app_handle()));
-                saved_state.windows.into_iter().for_each(|v| {
+                saved_state.viewers.into_iter().for_each(|v| {
                     let app_handle = app.app_handle();
                     tokio::spawn(async move {
                         let label = v.label.clone();
@@ -122,6 +135,20 @@ pub fn open_new_viewer() -> Builder<Wry> {
                         .unwrap();
                     });
                 });
+                saved_state.explorers.into_iter().for_each(|v| {
+                    let app_handle = app.app_handle();
+                    tokio::spawn(async move {
+                        let label = v.label.clone();
+                        tauri::WindowBuilder::new(
+                            &app_handle,
+                            label.clone(),
+                            tauri::WindowUrl::App("explorer.html".into()),
+                        )
+                        .title("Image Explorer")
+                        .build()
+                        .unwrap();
+                    });
+                });
             }
             Ok(())
         })
@@ -131,15 +158,17 @@ pub fn open_new_viewer() -> Builder<Wry> {
                 tokio::spawn(async move {
                     let state = event.window().state::<AppState>();
                     let mut active = state.active.lock().await.clone();
-                    let mut windows = state.windows.lock().await.clone();
-                    if !windows.is_empty() {
+                    let mut viewers = state.viewers.lock().await.clone();
+                    if !viewers.is_empty() {
                         active.label = "label-0".to_string();
-                        windows[0].label = "label-0".to_string();
+                        viewers[0].label = "label-0".to_string();
                     }
+                    let explorers = state.explorers.lock().await.clone();
                     let saved_state = SavedState {
                         count: *state.count.lock().await,
                         active,
-                        windows,
+                        viewers,
+                        explorers,
                     };
                     let dir = path::app_data_dir(&tauri::Config::default()).unwrap();
                     let path = dir.join("state.json");
@@ -157,7 +186,11 @@ pub fn open_new_viewer() -> Builder<Wry> {
                 tokio::spawn(async move {
                     let state = event.window().state::<AppState>();
                     let label = event.window().label().to_string();
-                    remove_window_state(label, state).await
+                    if label.starts_with("explorer") {
+                        remove_explorer_state(label, state).await
+                    } else {
+                        remove_viewer_state(label, state).await
+                    }
                 });
             }
         })
@@ -167,20 +200,31 @@ pub fn open_new_viewer() -> Builder<Wry> {
             get_filenames_inner_zip,
             read_image_in_zip,
             subscribe_dir_notification,
-            open_new_window,
-            open_new_tab,
-            open_dialog,
-            remove_tab,
-            change_active_tab,
-            request_restore_state,
-            change_active_window,
-            explore_path,
-            show_devices,
-            get_page_count,
+            open_new_viewer,
+            open_new_viewer_tab,
+            open_image_dialog,
+            remove_viewer_tab,
+            change_active_viewer_tab,
+            request_restore_viewer_state,
+            change_active_viewer,
+            change_active_explorer_tab,
+            request_restore_explorer_state,
+            request_restore_explorer_tab_state,
+            open_new_explorer,
+            open_new_explorer_tab,
+            remove_explorer_tab,
+            change_explorer_page,
+            change_explorer_transfer_path,
+            change_explorer_path,
+            reset_explorer_tab,
+            move_explorer_forward,
+            move_explorer_backward,
+            move_explorer_to_end,
+            move_explorer_to_start,
             transfer_folder,
             change_viewing,
             move_forward,
             move_backward,
-            request_restore_tab_state,
+            request_restore_viewer_tab_state,
         ])
 }
