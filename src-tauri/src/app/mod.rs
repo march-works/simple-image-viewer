@@ -27,7 +27,7 @@ use crate::{
     },
     grpc::{add_tab, new_window, server},
     service::app_state::{
-        remove_explorer_state, remove_viewer_state, ActiveViewer, AppState, ViewerState,
+        remove_explorer_state, remove_viewer_state, ActiveViewer, AppState, ExplorerState, ViewerState
     },
 };
 
@@ -61,7 +61,8 @@ fn get_running_count() -> i32 {
 struct SavedState {
     count: i32,
     active: ActiveViewer,
-    windows: Vec<ViewerState>,
+    viewers: Vec<ViewerState>,
+    explorers: Vec<ExplorerState>,
 }
 
 impl Default for SavedState {
@@ -71,12 +72,13 @@ impl Default for SavedState {
             active: ActiveViewer {
                 label: "label-0".to_string(),
             },
-            windows: vec![ViewerState {
+            viewers: vec![ViewerState {
                 label: "label-0".to_string(),
                 count: 0,
                 active: None,
                 tabs: vec![],
             }],
+            explorers: vec![],
         }
     }
 }
@@ -92,8 +94,8 @@ pub fn create_viewer() -> Builder<Wry> {
     let app_state = AppState {
         count: Mutex::new(saved_state.count),
         active: Mutex::new(saved_state.active),
-        viewers: Mutex::new(saved_state.windows.clone()),
-        explorers: Mutex::new(vec![]),
+        viewers: Mutex::new(saved_state.viewers.clone()),
+        explorers: Mutex::new(saved_state.explorers.clone()),
     };
     tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::default().build())
@@ -117,7 +119,7 @@ pub fn create_viewer() -> Builder<Wry> {
                 }
             } else {
                 tokio::spawn(server::run_server(app.app_handle()));
-                saved_state.windows.into_iter().for_each(|v| {
+                saved_state.viewers.into_iter().for_each(|v| {
                     let app_handle = app.app_handle();
                     tokio::spawn(async move {
                         let label = v.label.clone();
@@ -132,6 +134,20 @@ pub fn create_viewer() -> Builder<Wry> {
                         .unwrap();
                     });
                 });
+                saved_state.explorers.into_iter().for_each(|v| {
+                    let app_handle = app.app_handle();
+                    tokio::spawn(async move {
+                        let label = v.label.clone();
+                        tauri::WindowBuilder::new(
+                            &app_handle,
+                            label.clone(),
+                            tauri::WindowUrl::App("explorer.html".into()),
+                        )
+                        .title("Image Explorer")
+                        .build()
+                        .unwrap();
+                    });
+                });
             }
             Ok(())
         })
@@ -141,15 +157,17 @@ pub fn create_viewer() -> Builder<Wry> {
                 tokio::spawn(async move {
                     let state = event.window().state::<AppState>();
                     let mut active = state.active.lock().await.clone();
-                    let mut windows = state.viewers.lock().await.clone();
-                    if !windows.is_empty() {
+                    let mut viewers = state.viewers.lock().await.clone();
+                    if !viewers.is_empty() {
                         active.label = "label-0".to_string();
-                        windows[0].label = "label-0".to_string();
+                        viewers[0].label = "label-0".to_string();
                     }
+                    let explorers = state.explorers.lock().await.clone();
                     let saved_state = SavedState {
                         count: *state.count.lock().await,
                         active,
-                        windows,
+                        viewers,
+                        explorers,
                     };
                     let dir = path::app_data_dir(&tauri::Config::default()).unwrap();
                     let path = dir.join("state.json");

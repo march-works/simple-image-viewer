@@ -1,4 +1,3 @@
-use base64::{engine::general_purpose, Engine};
 use serde::{Deserialize, Serialize};
 use std::fs::read_dir;
 use sysinfo::Disks;
@@ -62,7 +61,6 @@ pub struct ViewerState {
 pub struct Thumbnail {
     pub path: String,
     pub filename: String,
-    pub thumbnail: String,
     pub thumbpath: String,
 }
 
@@ -524,7 +522,7 @@ pub(crate) fn get_prev_in_tree(viewing: &String, tree: &Vec<FileTree>) -> Option
     None
 }
 
-const CATALOG_PER_PAGE: usize = 20;
+const CATALOG_PER_PAGE: usize = 50;
 
 pub(crate) fn explore_path(filepath: &str, page: usize) -> Result<Vec<Thumbnail>, String> {
     let dirs = read_dir(filepath).map_err(|_| "failed to open path")?;
@@ -544,7 +542,6 @@ pub(crate) fn explore_path(filepath: &str, page: usize) -> Result<Vec<Thumbnail>
         }
         let inner = read_dir(entry.path());
         if let Ok(mut inner_file) = inner {
-            let mut thumb = "".to_string();
             let mut thumbpath = "".to_string();
             for inn_v in inner_file.by_ref() {
                 if let Ok(filepath) = inn_v {
@@ -556,8 +553,6 @@ pub(crate) fn explore_path(filepath: &str, page: usize) -> Result<Vec<Thumbnail>
                         .unwrap_or_default()
                         .to_string();
                     if extensions.iter().any(|v| *v == ext) {
-                        let img = std::fs::read(filepath.path()).unwrap_or_default();
-                        thumb = general_purpose::STANDARD_NO_PAD.encode(img);
                         thumbpath = filepath.path().to_str().unwrap_or_default().to_string();
                         break;
                     }
@@ -568,7 +563,6 @@ pub(crate) fn explore_path(filepath: &str, page: usize) -> Result<Vec<Thumbnail>
             thumbs.push(Thumbnail {
                 path: entry.path().to_str().unwrap().to_string(),
                 filename: entry.file_name().to_str().unwrap().to_string(),
-                thumbnail: thumb,
                 thumbpath,
             });
         }
@@ -578,7 +572,7 @@ pub(crate) fn explore_path(filepath: &str, page: usize) -> Result<Vec<Thumbnail>
 
 pub(crate) async fn get_page_count(filepath: &str) -> Result<usize, String> {
     let dirs = read_dir(filepath).map_err(|_| "failed to open inner path")?;
-    Ok(dirs.count() / CATALOG_PER_PAGE)
+    Ok(dirs.count() / CATALOG_PER_PAGE + 1)
 }
 
 pub(crate) fn get_devices() -> Result<Vec<Thumbnail>, String> {
@@ -590,7 +584,6 @@ pub(crate) fn get_devices() -> Result<Vec<Thumbnail>, String> {
             Thumbnail {
                 path: file.clone(),
                 filename: file,
-                thumbnail: "".to_string(),
                 thumbpath: "".to_string(),
             }
         })

@@ -1,4 +1,4 @@
-import { createSignal, onCleanup, onMount } from 'solid-js';
+import { createSignal, onCleanup } from 'solid-js';
 import { ExplorerTabs } from './ExplorerTabs';
 import { ExplorerTab, TabState } from './ExplorerTab';
 import { UnlistenFn, listen } from '@tauri-apps/api/event';
@@ -17,16 +17,14 @@ const Explorer = () => {
   const [panes, setPanes] = createSignal<TabState[]>([]);
   let unListenRef: UnlistenFn | undefined = undefined;
 
-  onMount(async () => {
-    listen('explorer-state-changed', (event) => {
-      const { active, tabs } = event.payload as ExplorerState;
-      setPanes(tabs);
-      setActiveKey(active?.key);
-      appWindow.setFocus();
-    }).then((unListen) => (unListenRef = unListen));
+  listen('explorer-state-changed', (event) => {
+    const { active, tabs } = event.payload as ExplorerState;
+    setPanes(tabs);
+    setActiveKey(active?.key);
+    appWindow.setFocus();
+  }).then((unListen) => (unListenRef = unListen));
 
-    invoke('request_restore_explorer_state', { label: appWindow.label });
-  });
+  invoke('request_restore_explorer_state', { label: appWindow.label });
 
   onCleanup(async () => {
     unListenRef && unListenRef();
