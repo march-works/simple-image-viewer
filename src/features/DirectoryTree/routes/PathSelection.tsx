@@ -1,4 +1,4 @@
-import { Component, onCleanup } from 'solid-js';
+import { Component } from 'solid-js';
 import { DirectoryList } from '../components/DirectoryList';
 import { FileTree, File } from '../../../pages/viewer/ViewerTab';
 
@@ -15,7 +15,7 @@ export const PathSelection: Component<Props> = (props) => {
         <DirectoryList
           viewing={props.viewing}
           tree={props.tree}
-          onClick={props.onSelectedChanged}
+          onClick={(path) => props.onSelectedChanged(path)}
         />
       </div>
     </div>
