@@ -27,7 +27,8 @@ use crate::{
     },
     grpc::{add_tab, new_window, server},
     service::app_state::{
-        remove_explorer_state, remove_viewer_state, ActiveViewer, AppState, ExplorerState, ViewerState
+        remove_explorer_state, remove_viewer_state, ActiveViewer, AppState, ExplorerState,
+        ViewerState,
     },
 };
 
