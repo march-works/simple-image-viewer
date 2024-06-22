@@ -4,11 +4,11 @@ import {
   HiSolidChevronLeft,
   HiSolidChevronRight,
 } from 'solid-icons/hi';
-import { Component, For } from 'solid-js';
+import { Component, For, Show } from 'solid-js';
 
 type Props = {
-  current: number;
-  end: number;
+  current?: number;
+  end?: number;
   onClickPage: (page: number) => void;
   onClickPrev: () => void;
   onClickNext: () => void;
@@ -17,22 +17,25 @@ type Props = {
 };
 
 export const Pagination: Component<Props> = (props) => {
-  const start = () => Math.max(props.current - 4, 1);
-  const length = () => Math.min(props.end - start() + 1, 9);
+  const start = () => Math.max((props.current ?? 1) - 4, 1);
+  const length = () => Math.min((props.end ?? 1) - start() + 1, 9);
+
   return (
     <div class="flex items-center">
-      <div
-        class="p-2 border-neutral-500 bg-neutral-900 text-neutral-400 transition-colors hover:bg-neutral-700 hover:text-neutral-300"
-        onClick={() => props.onClickStart()}
-      >
-        <HiSolidChevronDoubleLeft class="text-2xl" />
-      </div>
-      <div
-        class="p-2 border-neutral-500 bg-neutral-900 text-neutral-400 transition-colors hover:bg-neutral-700 hover:text-neutral-300"
-        onClick={() => props.onClickPrev()}
-      >
-        <HiSolidChevronLeft class="text-2xl" />
-      </div>
+      <Show when={props.current && props.current > 1}>
+        <div
+          class="p-2 border-neutral-500 bg-neutral-900 text-neutral-400 transition-colors hover:bg-neutral-700 hover:text-neutral-300"
+          onClick={() => props.onClickStart()}
+        >
+          <HiSolidChevronDoubleLeft class="text-2xl" />
+        </div>
+        <div
+          class="p-2 border-neutral-500 bg-neutral-900 text-neutral-400 transition-colors hover:bg-neutral-700 hover:text-neutral-300"
+          onClick={() => props.onClickPrev()}
+        >
+          <HiSolidChevronLeft class="text-2xl" />
+        </div>
+      </Show>
       <For each={Array(length()).fill(undefined)}>
         {(_, i) => (
           <div
@@ -47,18 +50,20 @@ export const Pagination: Component<Props> = (props) => {
           </div>
         )}
       </For>
-      <div
-        class="p-2 border-neutral-500 bg-neutral-900 text-neutral-400 transition-colors hover:bg-neutral-700 hover:text-neutral-300"
-        onClick={() => props.onClickNext()}
-      >
-        <HiSolidChevronRight class="text-2xl" />
-      </div>
-      <div
-        class="p-2 border-neutral-500 bg-neutral-900 text-neutral-400 transition-colors hover:bg-neutral-700 hover:text-neutral-300"
-        onClick={() => props.onClickEnd()}
-      >
-        <HiSolidChevronDoubleRight class="text-2xl" />
-      </div>
+      <Show when={props.current && props.end && props.current < props.end}>
+        <div
+          class="p-2 border-neutral-500 bg-neutral-900 text-neutral-400 transition-colors hover:bg-neutral-700 hover:text-neutral-300"
+          onClick={() => props.onClickNext()}
+        >
+          <HiSolidChevronRight class="text-2xl" />
+        </div>
+        <div
+          class="p-2 border-neutral-500 bg-neutral-900 text-neutral-400 transition-colors hover:bg-neutral-700 hover:text-neutral-300"
+          onClick={() => props.onClickEnd()}
+        >
+          <HiSolidChevronDoubleRight class="text-2xl" />
+        </div>
+      </Show>
     </div>
   );
 };

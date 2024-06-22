@@ -1,4 +1,4 @@
-import { Component, For, createSignal, onCleanup, onMount } from 'solid-js';
+import { Component, For, createEffect, createSignal, on, onCleanup } from 'solid-js';
 import { Pagination } from '../../components/Pagination/Pagination';
 import { Folder } from '../../features/Folder/routes/Folder';
 import { Thumbnail } from '../../features/Folder/types/Thumbnail';
@@ -28,31 +28,33 @@ type Props = {
 export const ExplorerTab: Component<Props> = (props) => {
   const [transferPath, setTransferPath] = createSignal<string>();
   const [folders, setFolders] = createSignal<Thumbnail[]>([]);
-  const [page, setPage] = createSignal<number>(1);
-  const [end, setEnd] = createSignal<number>(1);
+  const [pagination, setPagination] = createSignal<[number, number]>([1, 1]);
   let unListenRef: UnlistenFn | undefined = undefined;
+  let divRef!: HTMLDivElement;
 
-  onMount(async () => {
-    listen('explorer-tab-state-changed', (event) => {
-      const { key, transferPath, page, end, folders } =
-        event.payload as TabState;
-      if (key !== props.tabKey) return;
-      console.log(event.payload);
-      setPage(page);
-      setEnd(end);
-      setTransferPath(transferPath);
-      setFolders(folders);
-    }).then((unListen) => (unListenRef = unListen));
+  listen('explorer-tab-state-changed', (event) => {
+    const { key, transferPath, page, end, folders } =
+      event.payload as TabState;
+    if (key !== props.tabKey) return;
+    setPagination([page, end]);
+    setTransferPath(transferPath);
+    setFolders(folders);
+  }).then((unListen) => (unListenRef = unListen));
 
-    invoke('request_restore_explorer_tab_state', {
-      label: appWindow.label,
-      key: props.tabKey,
-    });
+  invoke('request_restore_explorer_tab_state', {
+    label: appWindow.label,
+    // eslint-disable-next-line solid/reactivity
+    key: props.tabKey,
   });
 
   onCleanup(() => {
     unListenRef && unListenRef();
   });
+
+  createEffect(on(folders, () => {
+    if (!divRef) return;
+    divRef.scrollTop = 0;
+  }));
 
   const selectTransferPath = async () => {
     const dir = await open({
@@ -68,7 +70,7 @@ export const ExplorerTab: Component<Props> = (props) => {
   };
 
   const onClick = (thumb: Thumbnail) => {
-    if (thumb.thumbnail) {
+    if (thumb.thumbpath) {
       invoke('open_new_viewer_tab', {
         path: thumb.thumbpath,
       });
@@ -147,7 +149,7 @@ export const ExplorerTab: Component<Props> = (props) => {
           </span>
         </div>
       </div>
-      <div class="relative flex flex-row flex-wrap p-5 gap-5 overflow-auto">
+      <div ref={divRef} class="relative flex flex-row flex-wrap p-5 gap-5 overflow-auto">
         <For each={folders()}>
           {(item) => (
             <Folder
@@ -166,8 +168,8 @@ export const ExplorerTab: Component<Props> = (props) => {
       </div>
       <div class="p-1 h-12 self-center">
         <Pagination
-          current={page()}
-          end={end()}
+          current={pagination()[0]}
+          end={pagination()[1]}
           onClickPrev={moveBackward}
           onClickNext={moveForward}
           onClickPage={movePage}
