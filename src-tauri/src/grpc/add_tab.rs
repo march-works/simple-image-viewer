@@ -7,7 +7,7 @@ use crate::{
         file_path_transfer_server::FilePathTransfer, FilePathTransferRequest,
         FilePathTransferResponse,
     },
-    service::app_state::{add_tab_state, AppState},
+    service::app_state::{add_viewer_tab_state, AppState},
 };
 
 pub struct Transferer {
@@ -28,10 +28,10 @@ impl FilePathTransfer for Transferer {
     ) -> Result<Response<FilePathTransferResponse>, Status> {
         let state = self.app.state::<AppState>();
         let label = state.active.lock().await.label.clone();
-        add_tab_state(&request.get_ref().path.clone(), &label, &state)
+        add_viewer_tab_state(&request.get_ref().path.clone(), &label, &state)
             .await
             .map_err(|_| Status::failed_precondition("system unavailable"))?;
-        let windows = state.windows.lock().await;
+        let windows = state.viewers.lock().await;
         let window_state = windows.iter().find(|v| v.label == label).unwrap();
         self.app
             .emit_to(label.as_str(), "window-state-changed", window_state)
