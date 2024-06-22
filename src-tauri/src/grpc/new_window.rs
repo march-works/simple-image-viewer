@@ -6,7 +6,7 @@ use crate::{
         new_window_opened_client::NewWindowOpenedClient, new_window_opened_server::NewWindowOpened,
         OpenNewWindowRequest, OpenNewWindowResponse,
     },
-    service::app_state::{add_window_state, AppState},
+    service::app_state::{add_viewer_state, AppState},
 };
 
 pub struct Opener {
@@ -26,7 +26,7 @@ impl NewWindowOpened for Opener {
         _: Request<OpenNewWindowRequest>,
     ) -> Result<Response<OpenNewWindowResponse>, Status> {
         let state = self.app.state::<AppState>();
-        let label = add_window_state(&state)
+        let label = add_viewer_state(&state)
             .await
             .map_err(|_| Status::failed_precondition("system unavailable"))?;
         tauri::WindowBuilder::new(&self.app, label, tauri::WindowUrl::App("index.html".into()))

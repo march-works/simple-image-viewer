@@ -12,7 +12,7 @@ type Props = {
 export const Folder: Component<Props> = (props) => {
   const [isRead, setIsRead] = createSignal<boolean>(false);
   return (
-    <div class="flex flex-col w-48 h-48 overflow-hidden relative">
+    <div class="flex flex-col w-96 h-96 overflow-hidden relative">
       <button
         class={`absolute top-0 right-4 ${
           isRead() ? 'text-green-400' : 'text-white'
@@ -25,7 +25,7 @@ export const Folder: Component<Props> = (props) => {
         <FaSolidCheck class="w-6 h-6" />
       </button>
       <img
-        class="block cursor-pointer w-40 h-40 object-contain"
+        class="block cursor-pointer w-80 h-80 object-contain"
         onClick={() => props.onClick(props.thumb)}
         src={`data:image/jpeg;base64,${props.thumb.thumbnail}`}
         onError={(e) => (e.currentTarget.src = fallback)}
