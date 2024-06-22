@@ -16,7 +16,7 @@ type Props<T> = {
   handleOnOpenExplorer: () => void;
 };
 
-export const Tabs = <T,>(props: Props<T>) => {
+export const ViewerTabs = <T,>(props: Props<T>) => {
   return (
     <div class="relative flex w-full flex-1 flex-col">
       <div class="flex h-8 w-full flex-none flex-row bg-neutral-800 align-baseline">

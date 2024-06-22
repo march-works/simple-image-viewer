@@ -1,4 +1,7 @@
+use base64::{engine::general_purpose, Engine};
 use serde::{Deserialize, Serialize};
+use std::fs::read_dir;
+use sysinfo::Disks;
 use tauri::{api::dialog::blocking::FileDialogBuilder, State};
 use tokio::sync::Mutex;
 
@@ -8,7 +11,7 @@ use crate::utils::file_utils::{
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ActiveWindow {
+pub struct ActiveViewer {
     pub label: String,
 }
 
@@ -39,7 +42,7 @@ pub enum FileTree {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TabState {
+pub struct ViewerTabState {
     pub title: String,
     pub key: String,
     pub path: String,
@@ -48,23 +51,51 @@ pub struct TabState {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WindowState {
+pub struct ViewerState {
     pub label: String,
     pub count: i32,
     pub active: Option<ActiveTab>,
-    pub tabs: Vec<TabState>,
+    pub tabs: Vec<ViewerTabState>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Thumbnail {
+    pub path: String,
+    pub filename: String,
+    pub thumbnail: String,
+    pub thumbpath: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExplorerTabState {
+    pub title: String,
+    pub key: String,
+    pub path: Option<String>,
+    pub transfer_path: Option<String>,
+    pub page: usize,
+    pub end: usize,
+    pub folders: Vec<Thumbnail>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExplorerState {
+    pub label: String,
+    pub count: i32,
+    pub active: Option<ActiveTab>,
+    pub tabs: Vec<ExplorerTabState>,
 }
 
 pub struct AppState {
     pub count: Mutex<i32>,
-    pub active: Mutex<ActiveWindow>,
-    pub windows: Mutex<Vec<WindowState>>,
+    pub active: Mutex<ActiveViewer>,
+    pub viewers: Mutex<Vec<ViewerState>>,
+    pub explorers: Mutex<Vec<ExplorerState>>,
 }
 
-pub(crate) async fn add_window_state<'a>(state: &State<'a, AppState>) -> Result<String, String> {
-    let mut windows = state.windows.lock().await;
-    let label = format!("label-{}", *state.count.lock().await);
-    (*windows).push(WindowState {
+pub(crate) async fn add_viewer_state<'a>(state: &State<'a, AppState>) -> Result<String, String> {
+    let mut viewers = state.viewers.lock().await;
+    let label = format!("viewer-{}", *state.count.lock().await);
+    (*viewers).push(ViewerState {
         label: label.clone(),
         count: 0,
         active: None,
@@ -74,31 +105,57 @@ pub(crate) async fn add_window_state<'a>(state: &State<'a, AppState>) -> Result<
     Ok(label)
 }
 
-pub(crate) async fn remove_window_state<'a>(
+pub(crate) async fn add_explorer_state<'a>(state: &State<'a, AppState>) -> Result<String, String> {
+    let mut explorers = state.explorers.lock().await;
+    let label = format!("explorer-{}", *state.count.lock().await);
+    (*explorers).push(ExplorerState {
+        label: label.clone(),
+        count: 0,
+        active: None,
+        tabs: vec![],
+    });
+    *state.count.lock().await += 1;
+    Ok(label)
+}
+
+pub(crate) async fn remove_viewer_state<'a>(
     label: String,
     state: State<'a, AppState>,
 ) -> Result<(), String> {
-    let mut windows = state.windows.lock().await;
-    let index = (*windows)
+    let mut viewers = state.viewers.lock().await;
+    let index = (*viewers)
         .iter()
         .position(|w| w.label == label)
-        .ok_or_else(|| "window not found".to_string())?;
-    (*windows).remove(index);
+        .ok_or_else(|| "viewer not found".to_string())?;
+    (*viewers).remove(index);
     Ok(())
 }
 
-pub(crate) async fn add_tab_state<'a>(
+pub(crate) async fn remove_explorer_state<'a>(
+    label: String,
+    state: State<'a, AppState>,
+) -> Result<(), String> {
+    let mut explorers = state.explorers.lock().await;
+    let index = (*explorers)
+        .iter()
+        .position(|w| w.label == label)
+        .ok_or_else(|| "explorer not found".to_string())?;
+    (*explorers).remove(index);
+    Ok(())
+}
+
+pub(crate) async fn add_viewer_tab_state<'a>(
     path: &String,
     label: &String,
     state: &State<'a, AppState>,
-) -> Result<WindowState, String> {
-    let mut windows = state.windows.lock().await;
-    let window_state = (*windows)
+) -> Result<ViewerState, String> {
+    let mut viewers = state.viewers.lock().await;
+    let viewer_state = (*viewers)
         .iter_mut()
         .find(|w| w.label == *label)
-        .ok_or_else(|| "window not found".to_string())?;
-    window_state.count += 1;
-    let key = format!("tab-{}", window_state.count);
+        .ok_or_else(|| "viewer not found".to_string())?;
+    viewer_state.count += 1;
+    let key = format!("tab-{}", viewer_state.count);
     let title = if is_executable_file(path) {
         get_parent_dir_name(path)
     } else {
@@ -120,43 +177,120 @@ pub(crate) async fn add_tab_state<'a>(
     } else {
         find_path_in_tree(&tree, path)
     };
-    let tab = TabState {
+    let tab = ViewerTabState {
         title,
         key: key.clone(),
         path: new_path,
         viewing,
         tree,
     };
-    window_state.tabs.push(tab.clone());
-    window_state.active = Some(ActiveTab { key: key.clone() });
-    Ok(window_state.clone())
+    viewer_state.tabs.push(tab.clone());
+    viewer_state.active = Some(ActiveTab { key: key.clone() });
+    Ok(viewer_state.clone())
 }
 
-pub(crate) async fn remove_tab_state(
+pub(crate) async fn add_explorer_tab_state<'a>(
     label: &String,
-    key: &String,
-    state: &State<'_, AppState>,
-) -> Result<WindowState, String> {
-    let mut windows = state.windows.lock().await;
-    let window_state = (*windows)
+    state: &State<'a, AppState>,
+) -> Result<ExplorerState, String> {
+    let mut explorers = state.explorers.lock().await;
+    let explorer_state = (*explorers)
         .iter_mut()
         .find(|w| w.label == *label)
-        .ok_or_else(|| "window not found".to_string())?;
-    let index = window_state
+        .ok_or_else(|| "explorer not found".to_string())?;
+    explorer_state.count += 1;
+    let key = format!("tab-{}", explorer_state.count);
+    let title = "Explorer".to_string();
+    let tab = ExplorerTabState {
+        title,
+        key: key.clone(),
+        path: None,
+        transfer_path: None,
+        page: 1,
+        end: 1,
+        folders: get_devices()?,
+    };
+    explorer_state.tabs.push(tab.clone());
+    explorer_state.active = Some(ActiveTab { key: key.clone() });
+    Ok(explorer_state.clone())
+}
+
+pub(crate) async fn reset_explorer_tab_state<'a>(
+    label: &String,
+    key: &String,
+    state: &State<'a, AppState>,
+) -> Result<ExplorerTabState, String> {
+    let mut explorers = state.explorers.lock().await;
+    let explorer_state = (*explorers)
+        .iter_mut()
+        .find(|w| w.label == *label)
+        .ok_or_else(|| "explorer not found".to_string())?;
+    let index = explorer_state
         .tabs
         .iter()
         .position(|t| t.key == *key)
         .ok_or_else(|| "tab not found".to_string())?;
-    window_state.tabs.remove(index);
-    if window_state.tabs.is_empty() {
-        window_state.active = None;
-    } else if window_state.active.is_some() && window_state.active.as_ref().unwrap().key == *key {
-        let new_key = window_state.tabs[std::cmp::min(index, window_state.tabs.len() - 1)]
+    let tab = &mut explorer_state.tabs[index];
+    tab.page = 1;
+    tab.end = 1;
+    tab.path = None;
+    tab.folders = get_devices()?;
+    Ok(tab.clone())
+}
+
+pub(crate) async fn remove_viewer_tab_state(
+    label: &String,
+    key: &String,
+    state: &State<'_, AppState>,
+) -> Result<ViewerState, String> {
+    let mut viewers = state.viewers.lock().await;
+    let viewer_state = (*viewers)
+        .iter_mut()
+        .find(|w| w.label == *label)
+        .ok_or_else(|| "viewer not found".to_string())?;
+    let index = viewer_state
+        .tabs
+        .iter()
+        .position(|t| t.key == *key)
+        .ok_or_else(|| "tab not found".to_string())?;
+    viewer_state.tabs.remove(index);
+    if viewer_state.tabs.is_empty() {
+        viewer_state.active = None;
+    } else if viewer_state.active.is_some() && viewer_state.active.as_ref().unwrap().key == *key {
+        let new_key = viewer_state.tabs[std::cmp::min(index, viewer_state.tabs.len() - 1)]
             .key
             .clone();
-        window_state.active = Some(ActiveTab { key: new_key });
+        viewer_state.active = Some(ActiveTab { key: new_key });
     }
-    Ok(window_state.clone())
+    Ok(viewer_state.clone())
+}
+
+pub(crate) async fn remove_explorer_tab_state(
+    label: &String,
+    key: &String,
+    state: &State<'_, AppState>,
+) -> Result<ExplorerState, String> {
+    let mut explorers = state.explorers.lock().await;
+    let explorer_state = (*explorers)
+        .iter_mut()
+        .find(|w| w.label == *label)
+        .ok_or_else(|| "explorer not found".to_string())?;
+    let index = explorer_state
+        .tabs
+        .iter()
+        .position(|t| t.key == *key)
+        .ok_or_else(|| "tab not found".to_string())?;
+    explorer_state.tabs.remove(index);
+    if explorer_state.tabs.is_empty() {
+        explorer_state.active = None;
+    } else if explorer_state.active.is_some() && explorer_state.active.as_ref().unwrap().key == *key
+    {
+        let new_key = explorer_state.tabs[std::cmp::min(index, explorer_state.tabs.len() - 1)]
+            .key
+            .clone();
+        explorer_state.active = Some(ActiveTab { key: new_key });
+    }
+    Ok(explorer_state.clone())
 }
 
 pub(crate) fn open_file_pick_dialog() -> Result<String, String> {
@@ -388,4 +522,77 @@ pub(crate) fn get_prev_in_tree(viewing: &String, tree: &Vec<FileTree>) -> Option
         }
     }
     None
+}
+
+const CATALOG_PER_PAGE: usize = 20;
+
+pub(crate) fn explore_path(filepath: &str, page: usize) -> Result<Vec<Thumbnail>, String> {
+    let dirs = read_dir(filepath).map_err(|_| "failed to open path")?;
+
+    let extensions = vec![
+        "jpg", "jpeg", "JPG", "JPEG", "jpe", "jfif", "pjpeg", "pjp", "png", "PNG", "gif", "tif",
+        "tiff", "bmp", "dib", "webp",
+    ];
+    let files = dirs
+        .skip((page - 1) * CATALOG_PER_PAGE)
+        .take(CATALOG_PER_PAGE);
+    let mut thumbs = vec![];
+    for entry in files.flatten() {
+        // TODO: zipの場合は飛ばさないようにする
+        if entry.path().is_file() {
+            continue;
+        }
+        let inner = read_dir(entry.path());
+        if let Ok(mut inner_file) = inner {
+            let mut thumb = "".to_string();
+            let mut thumbpath = "".to_string();
+            for inn_v in inner_file.by_ref() {
+                if let Ok(filepath) = inn_v {
+                    let ext = filepath
+                        .path()
+                        .extension()
+                        .unwrap_or_default()
+                        .to_str()
+                        .unwrap_or_default()
+                        .to_string();
+                    if extensions.iter().any(|v| *v == ext) {
+                        let img = std::fs::read(filepath.path()).unwrap_or_default();
+                        thumb = general_purpose::STANDARD_NO_PAD.encode(img);
+                        thumbpath = filepath.path().to_str().unwrap_or_default().to_string();
+                        break;
+                    }
+                } else {
+                    break;
+                }
+            }
+            thumbs.push(Thumbnail {
+                path: entry.path().to_str().unwrap().to_string(),
+                filename: entry.file_name().to_str().unwrap().to_string(),
+                thumbnail: thumb,
+                thumbpath,
+            });
+        }
+    }
+    Ok(thumbs)
+}
+
+pub(crate) async fn get_page_count(filepath: &str) -> Result<usize, String> {
+    let dirs = read_dir(filepath).map_err(|_| "failed to open inner path")?;
+    Ok(dirs.count() / CATALOG_PER_PAGE)
+}
+
+pub(crate) fn get_devices() -> Result<Vec<Thumbnail>, String> {
+    let disks = Disks::new_with_refreshed_list();
+    Ok(disks
+        .iter()
+        .map(|v| {
+            let file = v.mount_point().to_str().unwrap_or_default().to_string();
+            Thumbnail {
+                path: file.clone(),
+                filename: file,
+                thumbnail: "".to_string(),
+                thumbpath: "".to_string(),
+            }
+        })
+        .collect())
 }
