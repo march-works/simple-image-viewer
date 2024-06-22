@@ -12,10 +12,10 @@ use crate::{
     app::{
         explorer::{
             change_active_explorer_tab, change_explorer_page, change_explorer_path,
-            change_explorer_transfer_path, open_new_explorer,
-            open_new_explorer_tab, remove_explorer_tab, request_restore_explorer_state,
-            request_restore_explorer_tab_state, transfer_folder, reset_explorer_tab,
-            move_explorer_forward, move_explorer_backward, move_explorer_to_end, move_explorer_to_start,
+            change_explorer_transfer_path, move_explorer_backward, move_explorer_forward,
+            move_explorer_to_end, move_explorer_to_start, open_new_explorer, open_new_explorer_tab,
+            remove_explorer_tab, request_restore_explorer_state,
+            request_restore_explorer_tab_state, reset_explorer_tab, transfer_folder,
         },
         viewer::{
             change_active_viewer, change_active_viewer_tab, change_viewing,

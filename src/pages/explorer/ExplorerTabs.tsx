@@ -56,7 +56,10 @@ export const ExplorerTabs = <T,>(props: Props<T>) => {
           </div>
         </div>
       </div>
-      <div class="relative overflow-hidden" style={{ height: 'calc(100% - 2rem)' }}>
+      <div
+        class="relative overflow-hidden"
+        style={{ height: 'calc(100% - 2rem)' }}
+      >
         <For each={props.tabs}>
           {(tab) => (
             <div
