@@ -1,4 +1,11 @@
-import { Component, For, createEffect, createSignal, on, onCleanup } from 'solid-js';
+import {
+  Component,
+  For,
+  createEffect,
+  createSignal,
+  on,
+  onCleanup,
+} from 'solid-js';
 import { Pagination } from '../../components/Pagination/Pagination';
 import { Folder } from '../../features/Folder/routes/Folder';
 import { Thumbnail } from '../../features/Folder/types/Thumbnail';
@@ -33,8 +40,7 @@ export const ExplorerTab: Component<Props> = (props) => {
   let divRef!: HTMLDivElement;
 
   listen('explorer-tab-state-changed', (event) => {
-    const { key, transferPath, page, end, folders } =
-      event.payload as TabState;
+    const { key, transferPath, page, end, folders } = event.payload as TabState;
     if (key !== props.tabKey) return;
     setPagination([page, end]);
     setTransferPath(transferPath);
@@ -51,10 +57,12 @@ export const ExplorerTab: Component<Props> = (props) => {
     unListenRef && unListenRef();
   });
 
-  createEffect(on(folders, () => {
-    if (!divRef) return;
-    divRef.scrollTop = 0;
-  }));
+  createEffect(
+    on(folders, () => {
+      if (!divRef) return;
+      divRef.scrollTop = 0;
+    })
+  );
 
   const selectTransferPath = async () => {
     const dir = await open({
@@ -149,7 +157,10 @@ export const ExplorerTab: Component<Props> = (props) => {
           </span>
         </div>
       </div>
-      <div ref={divRef} class="relative flex flex-row flex-wrap p-5 gap-5 overflow-auto">
+      <div
+        ref={divRef}
+        class="relative flex flex-row flex-wrap p-5 gap-5 overflow-auto"
+      >
         <For each={folders()}>
           {(item) => (
             <Folder

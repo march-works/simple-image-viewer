@@ -12,7 +12,11 @@ type Props = {
 
 export const Folder: Component<Props> = (props) => {
   const [isRead, setIsRead] = createSignal<boolean>(false);
-  const [data] = createResource(() => props.thumb.thumbpath, () => props.thumb.thumbpath ? convertFileSrc(props.thumb.thumbpath) : fallback);
+  const [data] = createResource(
+    () => props.thumb.thumbpath,
+    () =>
+      props.thumb.thumbpath ? convertFileSrc(props.thumb.thumbpath) : fallback
+  );
   return (
     <div class="flex flex-col w-48 h-48 overflow-hidden relative">
       <button
