@@ -31,7 +31,7 @@ export const ExplorerTabs = <T,>(props: Props<T>) => {
                 }
                 onMouseDown={(e) => {
                   e.preventDefault();
-                  e.button === 1 && props.handleOnClose(tab.key)
+                  e.button === 1 && props.handleOnClose(tab.key);
                 }}
               >
                 <div
