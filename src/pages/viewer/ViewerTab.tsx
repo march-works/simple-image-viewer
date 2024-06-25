@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api';
-import { Component, createSignal, onCleanup, onMount } from 'solid-js';
+import { Component, createSignal, onCleanup } from 'solid-js';
 import { PathSelection } from '../../features/DirectoryTree/routes/PathSelection';
 import { ImageCanvas } from '../../features/Image/ImageCanvas';
 import { appWindow } from '@tauri-apps/api/window';
@@ -36,8 +36,8 @@ export type TabState = {
 
 type Props = {
   isActiveTab: boolean;
-  path: string;
-  tabKey: string;
+  initialPath: string;
+  initialTabKey: string;
 };
 
 export const ViewerTab: Component<Props> = (props) => {
@@ -68,26 +68,21 @@ export const ViewerTab: Component<Props> = (props) => {
     else if (event.button === 4) moveForward();
   };
 
-  onMount(() => {
-    listen('viewer-tab-state-changed', (event) => {
-      const { key, viewing, tree } = event.payload as TabState;
-      if (key !== props.tabKey) return;
-      setViewing(viewing);
-      setTree(tree);
-    }).then((unListen) => (unListenRef = unListen));
+  listen('viewer-tab-state-changed', (event) => {
+    const { key, viewing, tree } = event.payload as TabState;
+    if (key !== props.initialTabKey) return;
+    setViewing(viewing);
+    setTree(tree);
+  }).then((unListen) => (unListenRef = unListen));
 
-    invoke('subscribe_dir_notification', { filepath: props.path });
-    invoke('request_restore_viewer_tab_state', {
-      label: appWindow.label,
-      key: props.tabKey,
-    });
-    // listen('directory-tree-changed', (event) => {
-    //   if (event.payload === props.path) readDirAndSetTree();
-    // }).then((unListen) => (unListenRef = unListen));
-
-    document.addEventListener('keydown', handleOnKeyDown, false);
-    document.addEventListener('mouseup', handleOnButtonDown, false);
+  invoke('subscribe_dir_notification', { filepath: props.initialPath });
+  invoke('request_restore_viewer_tab_state', {
+    label: appWindow.label,
+    key: props.initialTabKey,
   });
+
+  document.addEventListener('keydown', handleOnKeyDown, false);
+  document.addEventListener('mouseup', handleOnButtonDown, false);
 
   onCleanup(() => {
     // unListenRef && unListenRef();
@@ -114,7 +109,7 @@ export const ViewerTab: Component<Props> = (props) => {
       <PathSelection
         viewing={viewing()}
         tree={tree()}
-        onSelectedChanged={(file) => changeViewing(props.tabKey, file)}
+        onSelectedChanged={(file) => changeViewing(props.initialTabKey, file)}
       />
     </div>
   );
