@@ -1,6 +1,7 @@
 import {
   Component,
   For,
+  Show,
   createEffect,
   createSignal,
   on,
@@ -30,12 +31,14 @@ type Props = {
   tabKey: string;
   path?: string;
   transferPath?: string;
+  isActiveTab: boolean;
 };
 
 export const ExplorerTab: Component<Props> = (props) => {
   const [transferPath, setTransferPath] = createSignal<string>();
   const [folders, setFolders] = createSignal<Thumbnail[]>([]);
   const [pagination, setPagination] = createSignal<[number, number]>([1, 1]);
+  const [isLoading, setIsLoading] = createSignal<boolean>(false);
   let unListenRef: UnlistenFn | undefined = undefined;
   let divRef!: HTMLDivElement;
 
@@ -45,6 +48,7 @@ export const ExplorerTab: Component<Props> = (props) => {
     setPagination([page, end]);
     setTransferPath(transferPath);
     setFolders(folders);
+    setIsLoading(false);
   }).then((unListen) => (unListenRef = unListen));
 
   invoke('request_restore_explorer_tab_state', {
@@ -103,6 +107,7 @@ export const ExplorerTab: Component<Props> = (props) => {
   };
 
   const movePage = (page: number) => {
+    setIsLoading(true);
     invoke('change_explorer_page', {
       label: appWindow.label,
       key: props.tabKey,
@@ -111,6 +116,7 @@ export const ExplorerTab: Component<Props> = (props) => {
   };
 
   const moveForward = () => {
+    setIsLoading(true);
     invoke('move_explorer_forward', {
       label: appWindow.label,
       key: props.tabKey,
@@ -118,6 +124,7 @@ export const ExplorerTab: Component<Props> = (props) => {
   };
 
   const moveBackward = () => {
+    setIsLoading(true);
     invoke('move_explorer_backward', {
       label: appWindow.label,
       key: props.tabKey,
@@ -125,6 +132,7 @@ export const ExplorerTab: Component<Props> = (props) => {
   };
 
   const moveFirst = () => {
+    setIsLoading(true);
     invoke('move_explorer_to_start', {
       label: appWindow.label,
       key: props.tabKey,
@@ -132,11 +140,36 @@ export const ExplorerTab: Component<Props> = (props) => {
   };
 
   const moveLast = () => {
+    setIsLoading(true);
     invoke('move_explorer_to_end', {
       label: appWindow.label,
       key: props.tabKey,
     });
   };
+
+  const handleOnKeyDown = (event: KeyboardEvent) => {
+    if (!props.isActiveTab) return;
+    event.preventDefault();
+    if (event.key === 'ArrowLeft') moveBackward();
+    else if (event.key === 'ArrowRight') moveForward();
+  };
+
+  const handleOnButtonDown = (event: MouseEvent) => {
+    if (!props.isActiveTab) return;
+    event.preventDefault();
+    if (event.button === 3) moveBackward();
+    else if (event.button === 4) moveForward();
+  };
+
+  document.addEventListener('keydown', handleOnKeyDown, false);
+  document.addEventListener('mouseup', handleOnButtonDown, false);
+
+  onCleanup(() => {
+    // unListenRef && unListenRef();
+    document.removeEventListener('keydown', handleOnKeyDown, false);
+    document.removeEventListener('mouseup', handleOnButtonDown, false);
+    unListenRef && unListenRef();
+  });
 
   return (
     <div class="h-full flex flex-col overflow-hidden">
@@ -157,26 +190,33 @@ export const ExplorerTab: Component<Props> = (props) => {
           </span>
         </div>
       </div>
-      <div
-        ref={divRef}
-        class="relative flex flex-row flex-wrap p-5 gap-5 overflow-auto"
-      >
-        <For each={folders()}>
-          {(item) => (
-            <Folder
-              thumb={item}
-              onMarkedAsRead={(path) => {
-                const to = transferPath();
-                if (!to) {
-                  return;
-                }
-                transfer(path, to);
-              }}
-              onClick={onClick}
-            />
-          )}
-        </For>
-      </div>
+      <Show when={!isLoading()} fallback={(
+        <div class="flex flex-1 items-center justify-center">
+          <div class="animate-spin rounded-full h-32 w-32 border-b-2 border-neutral-500" />
+        </div>
+      )}>
+        <div
+          ref={divRef}
+          class="relative flex flex-row flex-wrap p-5 gap-5 overflow-auto"
+        >
+          <For each={folders()}>
+            {(item) => (
+              <Folder
+                thumb={item}
+                showMarkAsRead={!!transferPath()}
+                onMarkedAsRead={(path) => {
+                  const to = transferPath();
+                  if (!to) {
+                    return;
+                  }
+                  transfer(path, to);
+                }}
+                onClick={onClick}
+              />
+            )}
+          </For>
+        </div>
+      </Show>
       <div class="p-1 h-12 self-center">
         <Pagination
           current={pagination()[0]}
