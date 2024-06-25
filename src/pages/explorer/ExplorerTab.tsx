@@ -190,11 +190,14 @@ export const ExplorerTab: Component<Props> = (props) => {
           </span>
         </div>
       </div>
-      <Show when={!isLoading()} fallback={(
-        <div class="flex flex-1 items-center justify-center">
-          <div class="animate-spin rounded-full h-32 w-32 border-b-2 border-neutral-500" />
-        </div>
-      )}>
+      <Show
+        when={!isLoading()}
+        fallback={
+          <div class="flex flex-1 items-center justify-center">
+            <div class="animate-spin rounded-full h-32 w-32 border-b-2 border-neutral-500" />
+          </div>
+        }
+      >
         <div
           ref={divRef}
           class="relative flex flex-row flex-wrap p-5 gap-5 overflow-auto"
