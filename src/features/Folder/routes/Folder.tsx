@@ -1,4 +1,4 @@
-import { Component, createResource, createSignal } from 'solid-js';
+import { Component, Show, createResource, createSignal } from 'solid-js';
 import { Thumbnail } from '../types/Thumbnail';
 import fallback from '../../../assets/noimage.png';
 import { FaSolidCheck } from 'solid-icons/fa';
@@ -6,6 +6,7 @@ import { convertFileSrc } from '@tauri-apps/api/tauri';
 
 type Props = {
   thumb: Thumbnail;
+  showMarkAsRead: boolean;
   onMarkedAsRead: (path: string) => void;
   onClick: (thumb: Thumbnail) => void;
 };
@@ -19,17 +20,19 @@ export const Folder: Component<Props> = (props) => {
   );
   return (
     <div class="flex flex-col w-48 h-48 overflow-hidden relative">
-      <button
-        class={`absolute top-0 right-4 ${
-          isRead() ? 'text-green-400' : 'text-white'
-        }`}
-        onClick={() => {
-          setIsRead(!isRead());
-          props.onMarkedAsRead(props.thumb.path);
-        }}
-      >
-        <FaSolidCheck class="w-6 h-6" />
-      </button>
+      <Show when={props.showMarkAsRead}>
+        <button
+          class={`absolute top-0 right-4 ${
+            isRead() ? 'text-green-400' : 'text-white'
+          }`}
+          onClick={() => {
+            setIsRead(!isRead());
+            props.onMarkedAsRead(props.thumb.path);
+          }}
+        >
+          <FaSolidCheck class="w-6 h-6" />
+        </button>
+      </Show>
       <img
         class="block cursor-pointer w-40 h-40 object-contain"
         onClick={() => props.onClick(props.thumb)}
