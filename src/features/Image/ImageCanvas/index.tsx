@@ -7,7 +7,6 @@ import {
   Match,
   on,
   onCleanup,
-  onMount,
   Show,
   Switch,
 } from 'solid-js';
@@ -52,9 +51,7 @@ export const ImageCanvas: Component<Props> = (props) => {
     else if (event.ctrlKey && event.key === 'o') zoomOut();
   };
 
-  onMount(() => {
-    document.addEventListener('keydown', handleOnKeyDown, false);
-  });
+  document.addEventListener('keydown', handleOnKeyDown, false);
 
   onCleanup(() => {
     document.removeEventListener('keydown', handleOnKeyDown, false);
