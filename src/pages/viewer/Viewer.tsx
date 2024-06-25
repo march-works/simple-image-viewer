@@ -4,7 +4,7 @@ import { getMatches } from '@tauri-apps/api/cli';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { appWindow } from '@tauri-apps/api/window';
 import { invoke } from '@tauri-apps/api';
-import { createSignal, onCleanup, onMount } from 'solid-js';
+import { createSignal, onCleanup } from 'solid-js';
 
 type ViewerState = {
   active?: {
@@ -29,24 +29,22 @@ const Viewer = () => {
     invoke('change_active_viewer');
   };
 
-  onMount(() => {
-    listen('viewer-state-changed', (event) => {
-      const { active, tabs } = event.payload as ViewerState;
-      setPanes(tabs);
-      setActiveKey(active?.key);
-      appWindow.setFocus();
-    }).then((unListen) => (unListenRef = unListen));
+  listen('viewer-state-changed', (event) => {
+    const { active, tabs } = event.payload as ViewerState;
+    setPanes(tabs);
+    setActiveKey(active?.key);
+    appWindow.setFocus();
+  }).then((unListen) => (unListenRef = unListen));
 
-    window.addEventListener('focus', handleOnFocus, false);
-    handleOnFocus();
+  window.addEventListener('focus', handleOnFocus, false);
+  handleOnFocus();
 
-    invoke('request_restore_viewer_state', { label: appWindow.label });
+  invoke('request_restore_viewer_state', { label: appWindow.label });
 
-    getMatches().then((matches) => {
-      const filepath = matches.args.filepath.value;
-      typeof filepath === 'string' &&
-        invoke('open_new_viewer_tab', { path: filepath });
-    });
+  getMatches().then((matches) => {
+    const filepath = matches.args.filepath.value;
+    typeof filepath === 'string' &&
+      invoke('open_new_viewer_tab', { path: filepath });
   });
 
   onCleanup(async () => {
@@ -74,8 +72,8 @@ const Viewer = () => {
         intoContent={(info) => (
           <ViewerTab
             isActiveTab={info.key === activeKey()}
-            path={info.path}
-            tabKey={info.key}
+            initialPath={info.path}
+            initialTabKey={info.key}
           />
         )}
         handleOnClick={onChange}

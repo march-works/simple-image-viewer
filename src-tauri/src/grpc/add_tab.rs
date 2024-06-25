@@ -34,10 +34,10 @@ impl FilePathTransfer for Transferer {
         let windows = state.viewers.lock().await;
         let window_state = windows.iter().find(|v| v.label == label).unwrap();
         self.app
-            .emit_to(label.as_str(), "window-state-changed", window_state)
+            .emit_to(label.as_str(), "viewer-state-changed", window_state)
             .unwrap_or_else(|_| {
                 self.app
-                    .emit_all("window-state-changed", window_state)
+                    .emit_all("viewer-state-changed", window_state)
                     .unwrap_or(())
             });
         let response = FilePathTransferResponse { result: 5 };

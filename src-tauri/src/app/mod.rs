@@ -71,10 +71,10 @@ impl Default for SavedState {
         SavedState {
             count: 1,
             active: ActiveViewer {
-                label: "label-0".to_string(),
+                label: "viewer-0".to_string(),
             },
             viewers: vec![ViewerState {
-                label: "label-0".to_string(),
+                label: "viewer-0".to_string(),
                 count: 0,
                 active: None,
                 tabs: vec![],
@@ -160,8 +160,8 @@ pub fn create_viewer() -> Builder<Wry> {
                     let mut active = state.active.lock().await.clone();
                     let mut viewers = state.viewers.lock().await.clone();
                     if !viewers.is_empty() {
-                        active.label = "label-0".to_string();
-                        viewers[0].label = "label-0".to_string();
+                        active.label = "viewer-0".to_string();
+                        viewers[0].label = "viewer-0".to_string();
                     }
                     let explorers = state.explorers.lock().await.clone();
                     let saved_state = SavedState {
