@@ -35,9 +35,10 @@ export const ViewerTabs = <T,>(props: Props<T>) => {
                   ? ' bg-gradient-to-b from-neutral-500 to-neutral-900 text-neutral-100'
                   : ' bg-neutral-900 text-neutral-400 hover:bg-gradient-to-b hover:from-neutral-600 hover:to-neutral-900 hover:text-neutral-300')
               }
-              onMouseDown={(e) =>
+              onMouseDown={(e) => {
+                e.preventDefault();
                 e.button === 1 && props.handleOnClose(tab.key)
-              }
+              }}
             >
               <div
                 class="flex-1 self-center truncate"
