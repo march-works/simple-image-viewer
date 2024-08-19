@@ -21,7 +21,7 @@ pub(crate) async fn transfer_folder(
 ) -> Result<(), String> {
     let options = CopyOptions::new();
     move_dir(from, to, &options).map_err(|_| "failed to move folder")?;
-    
+
     // フォルダ移動した結果の表示更新
     let mut explorers = state.explorers.lock().await;
     let explorer_state = (*explorers)
