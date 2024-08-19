@@ -21,7 +21,7 @@ export type TabState = {
   title: string;
   key: string;
   path?: string;
-  transferPath?: string;
+  transfer_path?: string;
   page: number;
   end: number;
   folders: Thumbnail[];
@@ -43,7 +43,13 @@ export const ExplorerTab: Component<Props> = (props) => {
   let divRef!: HTMLDivElement;
 
   listen('explorer-tab-state-changed', (event) => {
-    const { key, transferPath, page, end, folders } = event.payload as TabState;
+    const {
+      key,
+      transfer_path: transferPath,
+      page,
+      end,
+      folders,
+    } = event.payload as TabState;
     if (key !== props.tabKey) return;
     setPagination([page, end]);
     setTransferPath(transferPath);
@@ -79,7 +85,7 @@ export const ExplorerTab: Component<Props> = (props) => {
       return;
     }
     await invoke('change_explorer_transfer_path', {
-      transfer_path: dir,
+      transferPath: dir,
       key: props.tabKey,
       label: appWindow.label,
     });
@@ -103,6 +109,7 @@ export const ExplorerTab: Component<Props> = (props) => {
     await invoke('transfer_folder', {
       from,
       to,
+      label: appWindow.label,
     });
   };
 

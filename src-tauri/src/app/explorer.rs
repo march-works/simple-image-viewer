@@ -12,9 +12,43 @@ use crate::service::app_state::{
 pub struct StreamActivation(bool);
 
 #[tauri::command]
-pub(crate) async fn transfer_folder(from: String, to: String) -> Result<(), String> {
+pub(crate) async fn transfer_folder(
+    from: String,
+    to: String,
+    label: String,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<(), String> {
     let options = CopyOptions::new();
     move_dir(from, to, &options).map_err(|_| "failed to move folder")?;
+
+    // フォルダ移動した結果の表示更新
+    let mut explorers = state.explorers.lock().await;
+    let explorer_state = (*explorers)
+        .iter_mut()
+        .find(|w| w.label == label)
+        .ok_or_else(|| "explorer not found".to_string())?;
+    let index = explorer_state
+        .tabs
+        .iter()
+        .position(|t| t.key == explorer_state.active.as_ref().unwrap().key)
+        .ok_or_else(|| "tab not found".to_string())?;
+    let path = explorer_state.tabs[index].path.clone().unwrap_or_default();
+    let mut page = explorer_state.tabs[index].page;
+    let end = get_page_count(&path).await?;
+    if page > end {
+        page = end;
+    }
+    let thumbnails = explore_path(&path, page)?;
+    explorer_state.tabs[index].page = page;
+    explorer_state.tabs[index].folders = thumbnails;
+    explorer_state.tabs[index].end = end;
+    app.emit_to(
+        &label,
+        "explorer-tab-state-changed",
+        &explorer_state.tabs[index],
+    )
+    .map_err(|_| "failed to emit explorer state".to_string())?;
     Ok(())
 }
 
