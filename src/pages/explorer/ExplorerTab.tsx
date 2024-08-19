@@ -78,7 +78,7 @@ export const ExplorerTab: Component<Props> = (props) => {
     if (!dir) {
       return;
     }
-    setTransferPath(dir);
+    await invoke('change_explorer_transfer_path', { transfer_path: dir, key: props.tabKey, label: appWindow.label });
   };
 
   const onClick = (thumb: Thumbnail) => {
