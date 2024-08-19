@@ -43,9 +43,14 @@ export const ExplorerTab: Component<Props> = (props) => {
   let divRef!: HTMLDivElement;
 
   listen('explorer-tab-state-changed', (event) => {
-    const { key, transfer_path: transferPath, page, end, folders } = event.payload as TabState;
+    const {
+      key,
+      transfer_path: transferPath,
+      page,
+      end,
+      folders,
+    } = event.payload as TabState;
     if (key !== props.tabKey) return;
-    console.log(event.payload);
     setPagination([page, end]);
     setTransferPath(transferPath);
     setFolders(folders);
