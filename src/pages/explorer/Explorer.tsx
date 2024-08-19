@@ -57,7 +57,7 @@ const Explorer = () => {
           <ExplorerTab
             tabKey={info.key}
             path={info.path}
-            transferPath={info.transferPath}
+            transferPath={info.transfer_path}
             isActiveTab={info.key === activeKey()}
           />
         )}
