@@ -55,7 +55,7 @@ pub(crate) async fn open_new_explorer<'a>(
     let label = add_explorer_state(&state).await?;
     let explorer_state = add_explorer_tab_state(&label, &state).await?;
     WebviewWindowBuilder::new(&app, &label, WebviewUrl::App("explorer.html".into()))
-        .title("Image Explorer")
+        .title(super::get_explorer_title())
         .build()
         .map_err(|_| "system unavailable".to_string())?;
     app.emit_to(&label, "explorer-state-changed", &explorer_state)

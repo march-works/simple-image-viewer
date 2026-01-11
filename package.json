@@ -10,6 +10,7 @@
     "build": "vite build",
     "serve": "vite preview",
     "tauri": "tauri",
+    "tauri:dev": "tauri dev --config src-tauri/tauri.dev.conf.json",
     "lint": "eslint src/",
     "format-web": "prettier --write \"src/**/*.{js,jsx,ts,tsx,css,md,json}\" ",
     "format-back": "cd src-tauri && cargo fmt && cargo clippy --fix --allow-dirty --allow-staged",
