@@ -1,10 +1,11 @@
 import { ViewerTabs } from './ViewerTabs';
 import { ViewerTab, TabState } from './ViewerTab';
-import { getMatches } from '@tauri-apps/api/cli';
+import { getMatches } from '@tauri-apps/plugin-cli';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
-import { appWindow } from '@tauri-apps/api/window';
-import { invoke } from '@tauri-apps/api';
+import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
+import { invoke } from '@tauri-apps/api/core';
 import { createSignal, onCleanup } from 'solid-js';
+const appWindow = getCurrentWebviewWindow();
 
 type ViewerState = {
   active?: {

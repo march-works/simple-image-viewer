@@ -2,8 +2,9 @@ import { createSignal, onCleanup } from 'solid-js';
 import { ExplorerTabs } from './ExplorerTabs';
 import { ExplorerTab, TabState } from './ExplorerTab';
 import { UnlistenFn, listen } from '@tauri-apps/api/event';
-import { appWindow } from '@tauri-apps/api/window';
-import { invoke } from '@tauri-apps/api';
+import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
+import { invoke } from '@tauri-apps/api/core';
+const appWindow = getCurrentWebviewWindow();
 
 type ExplorerState = {
   active?: {

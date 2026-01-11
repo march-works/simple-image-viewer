@@ -1,9 +1,10 @@
-import { invoke } from '@tauri-apps/api';
+import { invoke } from '@tauri-apps/api/core';
 import { Component, createSignal, onCleanup } from 'solid-js';
 import { PathSelection } from '../../features/DirectoryTree/routes/PathSelection';
 import { ImageCanvas } from '../../features/Image/ImageCanvas';
-import { appWindow } from '@tauri-apps/api/window';
+import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { UnlistenFn, listen } from '@tauri-apps/api/event';
+const appWindow = getCurrentWebviewWindow();
 
 export type File = {
   key: string;
