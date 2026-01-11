@@ -1,4 +1,4 @@
-import { convertFileSrc, invoke } from '@tauri-apps/api/tauri';
+import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import {
   Component,
   createEffect,

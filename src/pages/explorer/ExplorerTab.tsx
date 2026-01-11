@@ -10,12 +10,13 @@ import {
 import { Pagination } from '../../components/Pagination/Pagination';
 import { Folder } from '../../features/Folder/routes/Folder';
 import { Thumbnail } from '../../features/Folder/types/Thumbnail';
-import { invoke } from '@tauri-apps/api';
-import { open } from '@tauri-apps/api/dialog';
+import { invoke } from '@tauri-apps/api/core';
+import { open } from '@tauri-apps/plugin-dialog';
 import { FaSolidFolderOpen } from 'solid-icons/fa';
 import { RiDocumentFolderTransferFill } from 'solid-icons/ri';
 import { UnlistenFn, listen } from '@tauri-apps/api/event';
-import { appWindow } from '@tauri-apps/api/window';
+import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
+const appWindow = getCurrentWebviewWindow()
 
 export type TabState = {
   title: string;

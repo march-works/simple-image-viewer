@@ -1,7 +1,7 @@
 use base64::{engine::general_purpose, Engine as _};
 use notify::{recommended_watcher, RecursiveMode, Watcher};
 use std::{io::Read, path::Path};
-use tauri::{AppHandle, Manager, State, Window};
+use tauri::{AppHandle, Emitter, State, WebviewWindow};
 
 use crate::service::app_state::{
     add_viewer_state, add_viewer_tab_state, find_key_in_tree, get_next_in_tree, get_prev_in_tree,
@@ -13,11 +13,11 @@ pub(crate) fn subscribe_dir_notification(filepath: String, app: AppHandle) {
     let path_inner = filepath.clone();
     recommended_watcher(move |res| match res {
         Ok(_) => {
-            app.emit_all("directory-tree-changed", &path_inner)
+            app.emit("directory-tree-changed", &path_inner)
                 .unwrap_or_default();
         }
         Err(_) => {
-            app.emit_all(
+            app.emit(
                 "directory-watch-error",
                 "Error occured while directory watching",
             )
@@ -73,7 +73,7 @@ pub(crate) fn read_image_in_zip(path: String, filename: String) -> String {
 
 #[tauri::command]
 pub(crate) async fn change_active_viewer<'a>(
-    window: Window,
+    window: WebviewWindow,
     state: State<'a, AppState>,
 ) -> Result<(), String> {
     let mut label = state.active.lock().await;
@@ -147,7 +147,7 @@ pub(crate) async fn open_image_dialog<'a>(
     state: State<'a, AppState>,
     app: AppHandle,
 ) -> Result<(), String> {
-    let filepath = open_file_pick_dialog()?;
+    let filepath = open_file_pick_dialog(&app).await?;
     let label = state.active.lock().await.label.clone();
     let viewer_state = add_viewer_tab_state(&filepath, &label, &state).await?;
     app.emit_to(&label, "viewer-state-changed", &viewer_state)

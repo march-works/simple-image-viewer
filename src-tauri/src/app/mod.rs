@@ -5,7 +5,12 @@ pub mod explorer;
 
 use serde_json::Value;
 use sysinfo::System;
-use tauri::{api::path, async_runtime::Mutex, utils::platform::current_exe, Builder, Manager, Wry};
+use tauri::{
+    async_runtime::Mutex,
+    utils::platform::current_exe,
+    Builder, Manager, WebviewUrl, WebviewWindowBuilder, Wry,
+};
+use tauri_plugin_cli::CliExt;
 
 use crate::{
     // app::explorer::open_explorer,
@@ -85,8 +90,8 @@ impl Default for SavedState {
 }
 
 pub fn create_viewer() -> Builder<Wry> {
-    let save_dir = path::app_data_dir(&tauri::Config::default()).unwrap();
-    let save_path = save_dir.join("state.json");
+    let save_dir = dirs::data_dir().unwrap_or_default();
+    let save_path = save_dir.join("simple-image-viewer").join("state.json");
     let saved_state = if let Ok(data) = std::fs::read_to_string(save_path.clone()) {
         serde_json::from_str::<SavedState>(&data).unwrap_or_default()
     } else {
@@ -99,35 +104,44 @@ pub fn create_viewer() -> Builder<Wry> {
         explorers: Mutex::new(saved_state.explorers.clone()),
     };
     tauri::Builder::default()
+        .plugin(tauri_plugin_cli::init())
         .plugin(tauri_plugin_store::Builder::default().build())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_process::init())
         .setup(|app| {
             // when other process already running
             if get_running_count() > 1 {
-                match app.get_cli_matches() {
+                match app.cli().matches() {
                     Ok(matches) => match &matches.args.get("filepath").map(|v| v.value.clone()) {
                         Some(Value::String(val)) => {
                             // when executed with file path
-                            tokio::spawn(add_tab::transfer(val.to_string(), app.app_handle()));
+                            tokio::spawn(add_tab::transfer(val.to_string(), app.app_handle().clone()));
                         }
                         _ => {
                             // when executed without file path
-                            tokio::spawn(new_window::open(app.app_handle()));
+                            tokio::spawn(new_window::open(app.app_handle().clone()));
                         }
                     },
                     Err(_) => {
-                        app.app_handle().exit(0);
+                        app.handle().exit(0);
                     }
                 }
             } else {
-                tokio::spawn(server::run_server(app.app_handle()));
+                tokio::spawn(server::run_server(app.app_handle().clone()));
                 saved_state.viewers.into_iter().for_each(|v| {
-                    let app_handle = app.app_handle();
+                    let app_handle = app.app_handle().clone();
+                    let label = v.label.clone();
+                    // Skip if window already exists (e.g., viewer-0 from config)
+                    if app_handle.get_webview_window(&label).is_some() {
+                        return;
+                    }
                     tokio::spawn(async move {
-                        let label = v.label.clone();
-                        tauri::WindowBuilder::new(
+                        WebviewWindowBuilder::new(
                             &app_handle,
                             label.clone(),
-                            tauri::WindowUrl::App("index.html".into()),
+                            WebviewUrl::App("index.html".into()),
                         )
                         .title("Simple Image Viewer")
                         .maximized(true)
@@ -136,13 +150,17 @@ pub fn create_viewer() -> Builder<Wry> {
                     });
                 });
                 saved_state.explorers.into_iter().for_each(|v| {
-                    let app_handle = app.app_handle();
+                    let app_handle = app.app_handle().clone();
+                    let label = v.label.clone();
+                    // Skip if window already exists
+                    if app_handle.get_webview_window(&label).is_some() {
+                        return;
+                    }
                     tokio::spawn(async move {
-                        let label = v.label.clone();
-                        tauri::WindowBuilder::new(
+                        WebviewWindowBuilder::new(
                             &app_handle,
                             label.clone(),
-                            tauri::WindowUrl::App("explorer.html".into()),
+                            WebviewUrl::App("explorer.html".into()),
                         )
                         .title("Image Explorer")
                         .build()
@@ -152,40 +170,12 @@ pub fn create_viewer() -> Builder<Wry> {
             }
             Ok(())
         })
-        .menu(tauri::Menu::new().add_item(tauri::CustomMenuItem::new("quit", "Quit")))
-        .on_menu_event(|event| {
-            if event.menu_item_id() == "quit" {
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
+                let window = window.clone();
                 tokio::spawn(async move {
-                    let state = event.window().state::<AppState>();
-                    let mut active = state.active.lock().await.clone();
-                    let mut viewers = state.viewers.lock().await.clone();
-                    if !viewers.is_empty() {
-                        active.label = "viewer-0".to_string();
-                        viewers[0].label = "viewer-0".to_string();
-                    }
-                    let explorers = state.explorers.lock().await.clone();
-                    let saved_state = SavedState {
-                        count: *state.count.lock().await,
-                        active,
-                        viewers,
-                        explorers,
-                    };
-                    let dir = path::app_data_dir(&tauri::Config::default()).unwrap();
-                    let path = dir.join("state.json");
-                    let _ = std::fs::write(
-                        path.clone(),
-                        serde_json::to_string(&saved_state).unwrap_or_default(),
-                    );
-                    println!("state saved to {:?}", path);
-                    std::process::exit(0);
-                });
-            }
-        })
-        .on_window_event(|event| {
-            if let tauri::WindowEvent::CloseRequested { .. } = event.event() {
-                tokio::spawn(async move {
-                    let state = event.window().state::<AppState>();
-                    let label = event.window().label().to_string();
+                    let state = window.state::<AppState>();
+                    let label = window.label().to_string();
                     if label.starts_with("explorer") {
                         remove_explorer_state(label, state).await
                     } else {
