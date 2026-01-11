@@ -42,7 +42,7 @@
   },
   "productName": "simple-image-viewer",
   "mainBinaryName": "simple-image-viewer",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "identifier": "com.simple-image-viewer.march",
   "plugins": {
     "cli": {
