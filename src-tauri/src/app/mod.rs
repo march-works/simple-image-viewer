@@ -15,8 +15,10 @@ use crate::{
             change_active_explorer_tab, change_explorer_page, change_explorer_path,
             change_explorer_transfer_path, move_explorer_backward, move_explorer_forward,
             move_explorer_to_end, move_explorer_to_start, open_new_explorer, open_new_explorer_tab,
-            remove_explorer_tab, request_restore_explorer_state,
-            request_restore_explorer_tab_state, reset_explorer_tab, transfer_folder,
+            refresh_explorer_tab, remove_explorer_tab, request_restore_explorer_state,
+            request_restore_explorer_tab_state, reset_explorer_tab,
+            subscribe_explorer_dir_notification, transfer_folder,
+            unsubscribe_explorer_dir_notification,
         },
         viewer::{
             change_active_viewer, change_active_viewer_tab, change_viewing,
@@ -100,6 +102,9 @@ pub fn create_viewer() -> Builder<Wry> {
         viewers: Mutex::new(saved_state.viewers.clone()),
         explorers: Mutex::new(saved_state.explorers.clone()),
         watchers: Mutex::new(std::collections::HashMap::new()),
+        thumbnail_cache: std::sync::Arc::new(tokio::sync::RwLock::new(
+            std::collections::HashMap::new(),
+        )),
     };
     let viewers_to_restore = saved_state.viewers.clone();
     let explorers_to_restore = saved_state.explorers.clone();
@@ -265,6 +270,9 @@ pub fn create_viewer() -> Builder<Wry> {
             move_explorer_to_end,
             move_explorer_to_start,
             transfer_folder,
+            subscribe_explorer_dir_notification,
+            unsubscribe_explorer_dir_notification,
+            refresh_explorer_tab,
             change_viewing,
             move_forward,
             move_backward,

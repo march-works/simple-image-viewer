@@ -2,10 +2,11 @@ use notify::RecommendedWatcher;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::read_dir;
+use std::sync::Arc;
 use sysinfo::Disks;
 use tauri::State;
 use tauri_plugin_dialog::DialogExt;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 
 use crate::utils::file_utils::{
     get_any_extensions, get_filename_without_extension, get_parent_dir, get_parent_dir_name,
@@ -93,6 +94,8 @@ pub struct AppState {
     pub explorers: Mutex<Vec<ExplorerState>>,
     /// ディレクトリ監視のwatcher管理 (path -> (watcher, 参照カウント))
     pub watchers: Mutex<HashMap<String, (RecommendedWatcher, usize)>>,
+    /// サムネイルキャッシュ (folder_path -> thumbnail_path)
+    pub thumbnail_cache: Arc<RwLock<HashMap<String, String>>>,
 }
 
 pub(crate) async fn add_viewer_state<'a>(state: &State<'a, AppState>) -> Result<String, String> {
@@ -552,55 +555,162 @@ pub(crate) fn get_prev_in_tree(viewing: &String, tree: &[FileTree]) -> Option<Fi
 
 const CATALOG_PER_PAGE: usize = 50;
 
-pub(crate) fn explore_path(filepath: &str, page: usize) -> Result<Vec<Thumbnail>, String> {
-    let dirs = read_dir(filepath).map_err(|_| "failed to open path")?;
-
+/// 最初の画像ファイルを見つける (キャッシュなしの場合の処理)
+fn find_first_image_in_folder(folder_path: &std::path::Path) -> String {
     let extensions = vec![
         "jpg", "jpeg", "JPG", "JPEG", "jpe", "jfif", "pjpeg", "pjp", "png", "PNG", "gif", "tif",
         "tiff", "bmp", "dib", "webp",
     ];
-    let files = dirs
-        .skip((page - 1) * CATALOG_PER_PAGE)
-        .take(CATALOG_PER_PAGE);
-    let mut thumbs = vec![];
-    for entry in files.flatten() {
-        // TODO: zipの場合は飛ばさないようにする
-        if entry.path().is_file() {
-            continue;
-        }
-        let inner = read_dir(entry.path());
-        if let Ok(mut inner_file) = inner {
-            let mut thumbpath = "".to_string();
-            for inn_v in inner_file.by_ref() {
-                if let Ok(filepath) = inn_v {
-                    let ext = filepath
-                        .path()
-                        .extension()
-                        .unwrap_or_default()
-                        .to_str()
-                        .unwrap_or_default()
-                        .to_string();
-                    if extensions.iter().any(|v| *v == ext) {
-                        thumbpath = filepath.path().to_str().unwrap_or_default().to_string();
-                        break;
-                    }
-                } else {
-                    break;
-                }
+
+    if let Ok(inner_file) = read_dir(folder_path) {
+        for entry in inner_file.flatten() {
+            let path = entry.path();
+            let ext = path
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or_default();
+            if extensions.contains(&ext) {
+                return path.to_str().unwrap_or_default().to_string();
             }
-            thumbs.push(Thumbnail {
-                path: entry.path().to_str().unwrap().to_string(),
-                filename: entry.file_name().to_str().unwrap().to_string(),
-                thumbpath,
-            });
         }
     }
+    String::new()
+}
+
+/// ディレクトリスキャン、ソート、ページネーション、サムネイル抽出を統合した最適化版
+pub(crate) async fn explore_path_with_count(
+    filepath: &str,
+    page: usize,
+    cache: Arc<RwLock<HashMap<String, String>>>,
+) -> Result<(Vec<Thumbnail>, usize), String> {
+    // 1. 単一スキャンで全エントリを収集
+    let dirs = read_dir(filepath).map_err(|_| "failed to open path")?;
+    let mut entries: Vec<_> = dirs
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().is_dir())
+        .collect();
+
+    // 2. ソート (ファイルシステム順を保証)
+    entries.sort_by_key(|a| a.file_name());
+
+    // 3. 総ページ数を計算
+    let total_count = entries.len();
+    let total_pages = if total_count == 0 {
+        1
+    } else {
+        total_count.div_ceil(CATALOG_PER_PAGE)
+    };
+
+    // 4. ページネーション
+    let start = (page.saturating_sub(1)) * CATALOG_PER_PAGE;
+    let end = (start + CATALOG_PER_PAGE).min(total_count);
+
+    if start >= total_count {
+        return Ok((vec![], total_pages));
+    }
+
+    let page_entries = &entries[start..end];
+
+    // 5. サムネイル抽出 (並列処理)
+    let tasks: Vec<_> = page_entries
+        .iter()
+        .map(|entry| {
+            let path = entry.path();
+            let filename = entry.file_name().to_str().unwrap_or_default().to_string();
+            let cache = cache.clone();
+
+            tokio::spawn(async move {
+                let path_str = path.to_str().unwrap_or_default().to_string();
+
+                // キャッシュチェック
+                {
+                    let cache_read = cache.read().await;
+                    if let Some(thumb) = cache_read.get(&path_str) {
+                        return Thumbnail {
+                            path: path_str,
+                            filename,
+                            thumbpath: thumb.clone(),
+                        };
+                    }
+                }
+
+                // キャッシュミス: ブロッキングI/Oで検索
+                let path_clone = path.clone();
+                let thumb =
+                    tokio::task::spawn_blocking(move || find_first_image_in_folder(&path_clone))
+                        .await
+                        .unwrap_or_default();
+
+                // キャッシュに保存
+                {
+                    let mut cache_write = cache.write().await;
+                    cache_write.insert(path_str.clone(), thumb.clone());
+                }
+
+                Thumbnail {
+                    path: path_str,
+                    filename,
+                    thumbpath: thumb,
+                }
+            })
+        })
+        .collect();
+
+    // 全タスクの完了を待つ
+    let mut thumbnails = Vec::new();
+    for task in tasks {
+        match task.await {
+            Ok(thumb) => thumbnails.push(thumb),
+            Err(_) => return Err("failed to extract thumbnails".to_string()),
+        }
+    }
+
+    Ok((thumbnails, total_pages))
+}
+
+// 旧関数は互換性のため残す (内部的には新関数を呼ぶ)
+pub(crate) fn explore_path(filepath: &str, page: usize) -> Result<Vec<Thumbnail>, String> {
+    // 同期版 - キャッシュなしで動作
+    let dirs = read_dir(filepath).map_err(|_| "failed to open path")?;
+    let mut entries: Vec<_> = dirs
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().is_dir())
+        .collect();
+
+    entries.sort_by_key(|a| a.file_name());
+
+    let total_count = entries.len();
+    let start = (page.saturating_sub(1)) * CATALOG_PER_PAGE;
+    let end = (start + CATALOG_PER_PAGE).min(total_count);
+
+    if start >= total_count {
+        return Ok(vec![]);
+    }
+
+    let page_entries = &entries[start..end];
+
+    let mut thumbs = vec![];
+    for entry in page_entries {
+        let thumbpath = find_first_image_in_folder(&entry.path());
+        thumbs.push(Thumbnail {
+            path: entry.path().to_str().unwrap_or_default().to_string(),
+            filename: entry.file_name().to_str().unwrap_or_default().to_string(),
+            thumbpath,
+        });
+    }
+
     Ok(thumbs)
 }
 
 pub(crate) async fn get_page_count(filepath: &str) -> Result<usize, String> {
     let dirs = read_dir(filepath).map_err(|_| "failed to open inner path")?;
-    Ok(dirs.count() / CATALOG_PER_PAGE + 1)
+    let count = dirs
+        .filter(|e| e.as_ref().map(|e| e.path().is_dir()).unwrap_or(false))
+        .count();
+    if count == 0 {
+        return Ok(1);
+    }
+    Ok(count.div_ceil(CATALOG_PER_PAGE))
 }
 
 pub(crate) fn get_devices() -> Result<Vec<Thumbnail>, String> {
@@ -616,4 +726,13 @@ pub(crate) fn get_devices() -> Result<Vec<Thumbnail>, String> {
             }
         })
         .collect())
+}
+
+/// 指定されたディレクトリのサムネイルキャッシュをクリア
+pub(crate) async fn clear_thumbnail_cache_for_dir(
+    dir_path: &str,
+    cache: Arc<RwLock<HashMap<String, String>>>,
+) {
+    let mut cache_write = cache.write().await;
+    cache_write.retain(|k, _| !k.starts_with(dir_path));
 }
