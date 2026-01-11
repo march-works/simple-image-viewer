@@ -1,17 +1,36 @@
 use base64::{engine::general_purpose, Engine as _};
 use notify::{recommended_watcher, RecursiveMode, Watcher};
-use std::{io::Read, path::Path};
+use std::fs::File as StdFile;
+use std::io::{BufReader, Read};
+use std::path::Path;
 use tauri::{AppHandle, Emitter, State, WebviewWindow};
 
 use crate::service::app_state::{
     add_viewer_state, add_viewer_tab_state, find_key_in_tree, get_next_in_tree, get_prev_in_tree,
-    open_file_pick_dialog, remove_viewer_tab_state, ActiveTab, ActiveViewer, AppState, File,
+    open_file_pick_dialog, rebuild_file_tree, remove_viewer_tab_state, ActiveTab, ActiveViewer,
+    AppState, File,
 };
 
+/// ディレクトリ監視を開始する
+/// watcherはAppStateで管理し、同じパスへの監視は参照カウントで共有する
 #[tauri::command]
-pub(crate) fn subscribe_dir_notification(filepath: String, app: AppHandle) {
+pub(crate) async fn subscribe_dir_notification(
+    filepath: String,
+    _tab_key: String,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    let mut watchers = state.watchers.lock().await;
+
+    // 既に同じパスの監視がある場合は参照カウントを増やすだけ
+    if let Some((_, ref_count)) = watchers.get_mut(&filepath) {
+        *ref_count += 1;
+        return Ok(());
+    }
+
+    // 新しいwatcherを作成
     let path_inner = filepath.clone();
-    recommended_watcher(move |res| match res {
+    let watcher = recommended_watcher(move |res| match res {
         Ok(_) => {
             app.emit("directory-tree-changed", &path_inner)
                 .unwrap_or_default();
@@ -24,51 +43,115 @@ pub(crate) fn subscribe_dir_notification(filepath: String, app: AppHandle) {
             .unwrap_or_default();
         }
     })
-    .map_or_else(
-        |_| (),
-        |mut watcher| {
-            watcher
-                .watch(Path::new(&filepath), RecursiveMode::Recursive)
-                .unwrap_or(())
-        },
-    );
+    .map_err(|e| format!("failed to create watcher: {}", e))?;
+
+    let mut watcher = watcher;
+    watcher
+        .watch(Path::new(&filepath), RecursiveMode::Recursive)
+        .map_err(|e| format!("failed to watch directory: {}", e))?;
+
+    watchers.insert(filepath, (watcher, 1));
+    Ok(())
 }
 
+/// ディレクトリ監視を解除する
+/// 参照カウントが0になった場合のみwatcherを削除
 #[tauri::command]
-pub(crate) fn open_file_image(filepath: String) -> String {
-    let img = std::fs::read(filepath).unwrap_or_default();
-    general_purpose::STANDARD_NO_PAD.encode(img)
-}
+pub(crate) async fn unsubscribe_dir_notification(
+    filepath: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let mut watchers = state.watchers.lock().await;
 
-#[tauri::command]
-pub(crate) fn get_filenames_inner_zip(filepath: String) -> Vec<String> {
-    let file = std::fs::read(filepath).unwrap_or_default();
-    let zip = zip::ZipArchive::new(std::io::Cursor::new(file));
-    let mut files = zip
-        .map(|f| f.file_names().map(|s| s.into()).collect::<Vec<String>>())
-        .unwrap_or_default();
-    files.sort();
-    files
-}
-
-#[tauri::command]
-pub(crate) fn read_image_in_zip(path: String, filename: String) -> String {
-    let file = std::fs::read(path).unwrap_or_default();
-    let zip = zip::ZipArchive::new(std::io::Cursor::new(file));
-    match zip {
-        Ok(mut e) => {
-            let inner = e.by_name(&filename);
-            match inner {
-                Ok(mut f) => {
-                    let mut buf = vec![];
-                    f.read_to_end(&mut buf).unwrap_or_default();
-                    general_purpose::STANDARD_NO_PAD.encode(&buf)
-                }
-                Err(_) => "".into(),
-            }
+    if let Some((_, ref_count)) = watchers.get_mut(&filepath) {
+        *ref_count -= 1;
+        if *ref_count == 0 {
+            watchers.remove(&filepath);
         }
-        Err(_) => "".into(),
     }
+    Ok(())
+}
+
+/// ディレクトリ変更通知を受けてファイルツリーを再構築する
+/// フロントエンドから directory-tree-changed イベントを受けた際に呼び出される
+#[tauri::command]
+pub(crate) async fn refresh_viewer_tab_tree(
+    tab_key: String,
+    label: String,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    let mut viewers = state.viewers.lock().await;
+    let viewer_state = (*viewers)
+        .iter_mut()
+        .find(|w| w.label == label)
+        .ok_or_else(|| "viewer not found".to_string())?;
+    let tab_state = viewer_state
+        .tabs
+        .iter_mut()
+        .find(|t| t.key == tab_key)
+        .ok_or_else(|| "tab not found".to_string())?;
+
+    // ZIPファイルかどうかを判定（viewing.file_typeで判断）
+    let is_compressed = tab_state
+        .viewing
+        .as_ref()
+        .map(|v| v.file_type == "Zip")
+        .unwrap_or(false);
+
+    // ファイルツリーを再構築
+    let new_tree = rebuild_file_tree(&tab_state.path, is_compressed);
+
+    // 現在表示中のファイルがまだ存在するか確認
+    let current_key = tab_state.viewing.as_ref().map(|v| v.key.clone());
+    let new_viewing = if let Some(key) = current_key {
+        find_key_in_tree(&new_tree, &key)
+    } else {
+        None
+    };
+
+    tab_state.tree = new_tree;
+    tab_state.viewing = new_viewing;
+
+    // フロントエンドに更新を通知
+    app.emit_to(&label, "viewer-tab-state-changed", tab_state.clone())
+        .map_err(|_| "failed to emit viewer state".to_string())?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub(crate) fn open_file_image(filepath: String) -> Result<String, String> {
+    let img = std::fs::read(&filepath).map_err(|e| format!("failed to read image: {}", e))?;
+    Ok(general_purpose::STANDARD_NO_PAD.encode(img))
+}
+
+/// ZIPファイル内のファイル名一覧を取得（ストリーミング読み込み）
+#[tauri::command]
+pub(crate) fn get_filenames_inner_zip(filepath: String) -> Result<Vec<String>, String> {
+    let file = StdFile::open(&filepath).map_err(|e| format!("failed to open zip: {}", e))?;
+    let reader = BufReader::new(file);
+    let zip = zip::ZipArchive::new(reader).map_err(|e| format!("failed to read zip: {}", e))?;
+    let mut files: Vec<String> = zip.file_names().map(|s| s.into()).collect();
+    files.sort();
+    Ok(files)
+}
+
+/// ZIP内の画像をBase64で読み込み（ストリーミング読み込み）
+#[tauri::command]
+pub(crate) fn read_image_in_zip(path: String, filename: String) -> Result<String, String> {
+    let file = StdFile::open(&path).map_err(|e| format!("failed to open zip: {}", e))?;
+    let reader = BufReader::new(file);
+    let mut zip = zip::ZipArchive::new(reader).map_err(|e| format!("failed to read zip: {}", e))?;
+
+    let mut inner = zip
+        .by_name(&filename)
+        .map_err(|e| format!("file not found in zip: {}", e))?;
+    let mut buf = Vec::with_capacity(inner.size() as usize);
+    inner
+        .read_to_end(&mut buf)
+        .map_err(|e| format!("failed to read file: {}", e))?;
+    Ok(general_purpose::STANDARD_NO_PAD.encode(&buf))
 }
 
 #[tauri::command]
