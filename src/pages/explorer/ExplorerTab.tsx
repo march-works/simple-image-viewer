@@ -7,7 +7,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { FaSolidFolderOpen } from 'solid-icons/fa';
 import { RiDocumentFolderTransferFill } from 'solid-icons/ri';
-import { UnlistenFn, listen } from '@tauri-apps/api/event';
+import { UnlistenFn } from '@tauri-apps/api/event';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 const appWindow = getCurrentWebviewWindow();
 
@@ -36,24 +36,26 @@ export const ExplorerTab: Component<Props> = (props) => {
   let unListenRef: UnlistenFn | undefined = undefined;
   let divRef!: HTMLDivElement;
 
-  listen('explorer-tab-state-changed', (event) => {
-    const {
-      key,
-      transfer_path: transferPath,
-      page,
-      end,
-      folders,
-    } = event.payload as TabState;
-    if (key !== props.tabKey) return;
-    setPagination([page, end]);
-    setTransferPath(transferPath);
-    setFolders(folders);
-    setIsLoading(false);
-  }).then((unListen) => (unListenRef = unListen));
+  // Use appWindow.listen to only receive events targeted at this window
+  appWindow
+    .listen('explorer-tab-state-changed', (event) => {
+      const {
+        key,
+        transfer_path: transferPath,
+        page,
+        end,
+        folders,
+      } = event.payload as TabState;
+      if (key !== props.tabKey) return;
+      setPagination([page, end]);
+      setTransferPath(transferPath);
+      setFolders(folders);
+      setIsLoading(false);
+    })
+    .then((unListen) => (unListenRef = unListen));
 
   invoke('request_restore_explorer_tab_state', {
     label: appWindow.label,
-    // eslint-disable-next-line solid/reactivity
     key: props.tabKey,
   });
 

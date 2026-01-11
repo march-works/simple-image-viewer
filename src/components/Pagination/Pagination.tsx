@@ -42,7 +42,7 @@ export const Pagination: Component<Props> = (props) => {
           <div
             class={`px-4 py-3 leading-tight border-neutral-500 bg-neutral-900 text-neutral-400 transition-colors hover:bg-neutral-700 hover:text-neutral-300 ${
               start() + i() === props.current
-                ? '!bg-neutral-600 !text-neutral-100'
+                ? 'bg-neutral-600! text-neutral-100!'
                 : 'cursor-pointer'
             }`}
             onClick={() => props.onClickPage(start() + i())}
