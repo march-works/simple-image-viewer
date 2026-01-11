@@ -319,8 +319,22 @@ pub(crate) async fn open_file_pick_dialog(app: &tauri::AppHandle) -> Result<Stri
     }
 }
 
+/// ディレクトリのファイルツリーを再構築する
+/// ディレクトリ変更通知を受けた際にフロントエンドから呼び出される
+pub(crate) fn rebuild_file_tree(path: &str, is_compressed: bool) -> Vec<FileTree> {
+    if is_compressed {
+        get_compressed_file_tree(&path.to_string())
+    } else {
+        let mut key_count = 0;
+        get_file_tree(&path.to_string(), &mut key_count)
+    }
+}
+
 fn get_file_tree(path: &String, key_count: &mut i32) -> Vec<FileTree> {
-    let dirs = std::fs::read_dir(path).unwrap();
+    let dirs = match std::fs::read_dir(path) {
+        Ok(d) => d,
+        Err(_) => return vec![],
+    };
     let mut files = dirs
         .map(|f| {
             let filepath = f.unwrap().path();

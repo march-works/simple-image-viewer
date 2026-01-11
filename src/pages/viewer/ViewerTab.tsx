@@ -1,10 +1,10 @@
 import { invoke } from '@tauri-apps/api/core';
+import { listen, UnlistenFn } from '@tauri-apps/api/event';
 import { createSignal, onCleanup, onMount } from 'solid-js';
 import type { Component } from 'solid-js';
 import { PathSelection } from '../../features/DirectoryTree/routes/PathSelection';
 import { ImageCanvas } from '../../features/Image/ImageCanvas';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
-import { UnlistenFn } from '@tauri-apps/api/event';
 const appWindow = getCurrentWebviewWindow();
 
 export type File = {
@@ -45,7 +45,8 @@ type Props = {
 export const ViewerTab: Component<Props> = (props) => {
   const [viewing, setViewing] = createSignal<File | undefined>(undefined);
   const [tree, setTree] = createSignal<FileTree[]>([]);
-  let unListenRef: UnlistenFn | undefined = undefined;
+  let unListenTabStateRef: UnlistenFn | undefined = undefined;
+  let unListenDirChangedRef: UnlistenFn | undefined = undefined;
 
   const moveForward = () => {
     invoke('move_forward', { label: appWindow.label });
@@ -77,13 +78,30 @@ export const ViewerTab: Component<Props> = (props) => {
       tabKey: props.initialTabKey,
     });
 
-    // イベントリスナーを登録し、確実にunListenRefに保存
-    unListenRef = await appWindow.listen('viewer-tab-state-changed', (event) => {
-      const { key, viewing, tree } = event.payload as TabState;
-      if (key !== props.initialTabKey) return;
-      setViewing(viewing);
-      setTree(tree);
-    });
+    // タブ状態変更イベントをリッスン
+    unListenTabStateRef = await appWindow.listen(
+      'viewer-tab-state-changed',
+      (event) => {
+        const { key, viewing, tree } = event.payload as TabState;
+        if (key !== props.initialTabKey) return;
+        setViewing(viewing);
+        setTree(tree);
+      },
+    );
+
+    // ディレクトリ変更イベントをリッスン（グローバルイベント）
+    unListenDirChangedRef = await listen<string>(
+      'directory-tree-changed',
+      (event) => {
+        // このタブが監視しているパスと一致する場合のみツリーを更新
+        if (event.payload === props.initialPath) {
+          invoke('refresh_viewer_tab_tree', {
+            tabKey: props.initialTabKey,
+            label: appWindow.label,
+          });
+        }
+      },
+    );
 
     invoke('request_restore_viewer_tab_state', {
       label: appWindow.label,
@@ -98,7 +116,8 @@ export const ViewerTab: Component<Props> = (props) => {
     document.removeEventListener('keydown', handleOnKeyDown, false);
     document.removeEventListener('mouseup', handleOnButtonDown, false);
     // Tauriイベントリスナーを解除
-    unListenRef?.();
+    unListenTabStateRef?.();
+    unListenDirChangedRef?.();
     // ディレクトリ監視を解除（参照カウント管理）
     await invoke('unsubscribe_dir_notification', {
       filepath: props.initialPath,
