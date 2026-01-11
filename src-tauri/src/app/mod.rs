@@ -23,7 +23,7 @@ use crate::{
             get_filenames_inner_zip, move_backward, move_forward, open_file_image,
             open_image_dialog, open_new_viewer, open_new_viewer_tab, read_image_in_zip,
             remove_viewer_tab, request_restore_viewer_state, request_restore_viewer_tab_state,
-            subscribe_dir_notification,
+            subscribe_dir_notification, unsubscribe_dir_notification,
         },
     },
     service::app_state::{
@@ -98,6 +98,7 @@ pub fn create_viewer() -> Builder<Wry> {
         active: Mutex::new(saved_state.active),
         viewers: Mutex::new(saved_state.viewers.clone()),
         explorers: Mutex::new(saved_state.explorers.clone()),
+        watchers: Mutex::new(std::collections::HashMap::new()),
     };
     let viewers_to_restore = saved_state.viewers.clone();
     let explorers_to_restore = saved_state.explorers.clone();
@@ -240,6 +241,7 @@ pub fn create_viewer() -> Builder<Wry> {
             get_filenames_inner_zip,
             read_image_in_zip,
             subscribe_dir_notification,
+            unsubscribe_dir_notification,
             open_new_viewer,
             open_new_viewer_tab,
             open_image_dialog,

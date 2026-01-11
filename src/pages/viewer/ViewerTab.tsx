@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { createSignal, onCleanup } from 'solid-js';
+import { createSignal, onCleanup, onMount } from 'solid-js';
 import type { Component } from 'solid-js';
 import { PathSelection } from '../../features/DirectoryTree/routes/PathSelection';
 import { ImageCanvas } from '../../features/Image/ImageCanvas';
@@ -43,7 +43,6 @@ type Props = {
 };
 
 export const ViewerTab: Component<Props> = (props) => {
-  // let unListenRef: UnlistenFn | undefined = undefined;
   const [viewing, setViewing] = createSignal<File | undefined>(undefined);
   const [tree, setTree] = createSignal<FileTree[]>([]);
   let unListenRef: UnlistenFn | undefined = undefined;
@@ -70,30 +69,40 @@ export const ViewerTab: Component<Props> = (props) => {
     else if (event.button === 4) moveForward();
   };
 
-  // Use appWindow.listen to only receive events targeted at this window
-  appWindow
-    .listen('viewer-tab-state-changed', (event) => {
+  // onMountで非同期リスナー登録を確実に待つ
+  onMount(async () => {
+    // ディレクトリ監視を開始（参照カウント付き）
+    await invoke('subscribe_dir_notification', {
+      filepath: props.initialPath,
+      tabKey: props.initialTabKey,
+    });
+
+    // イベントリスナーを登録し、確実にunListenRefに保存
+    unListenRef = await appWindow.listen('viewer-tab-state-changed', (event) => {
       const { key, viewing, tree } = event.payload as TabState;
       if (key !== props.initialTabKey) return;
       setViewing(viewing);
       setTree(tree);
-    })
-    .then((unListen) => (unListenRef = unListen));
+    });
 
-  invoke('subscribe_dir_notification', { filepath: props.initialPath });
-  invoke('request_restore_viewer_tab_state', {
-    label: appWindow.label,
-    key: props.initialTabKey,
+    invoke('request_restore_viewer_tab_state', {
+      label: appWindow.label,
+      key: props.initialTabKey,
+    });
   });
 
   document.addEventListener('keydown', handleOnKeyDown, false);
   document.addEventListener('mouseup', handleOnButtonDown, false);
 
-  onCleanup(() => {
-    // unListenRef && unListenRef();
+  onCleanup(async () => {
     document.removeEventListener('keydown', handleOnKeyDown, false);
     document.removeEventListener('mouseup', handleOnButtonDown, false);
-    unListenRef && unListenRef();
+    // Tauriイベントリスナーを解除
+    unListenRef?.();
+    // ディレクトリ監視を解除（参照カウント管理）
+    await invoke('unsubscribe_dir_notification', {
+      filepath: props.initialPath,
+    });
   });
 
   const changeViewing = (tabKey: string, file: File) => {
