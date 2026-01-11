@@ -24,8 +24,8 @@
       "eslint --fix"
     ],
     "src-tauri/**/*.rs": [
-      "cd src-tauri && cargo fmt --",
-      "cd src-tauri && cargo clippy --fix --allow-dirty --allow-staged --"
+      "sh -c 'cd src-tauri && cargo fmt'",
+      "sh -c 'cd src-tauri && cargo clippy --fix --allow-dirty --allow-staged'"
     ]
   },
   "license": "MIT",

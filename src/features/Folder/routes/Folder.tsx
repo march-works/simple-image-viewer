@@ -8,6 +8,7 @@ import { convertFileSrc } from '@tauri-apps/api/core';
 type Props = {
   thumb: Thumbnail;
   showMarkAsRead: boolean;
+  isHighlighted: boolean;
   onMarkedAsRead: (path: string) => void;
   onClick: (thumb: Thumbnail) => void;
 };
@@ -20,7 +21,13 @@ export const Folder: Component<Props> = (props) => {
       props.thumb.thumbpath ? convertFileSrc(props.thumb.thumbpath) : fallback,
   );
   return (
-    <div class="flex flex-col w-48 h-48 overflow-hidden relative">
+    <div
+      class={`flex flex-col w-48 h-48 overflow-hidden relative rounded-lg transition-all ${
+        props.isHighlighted
+          ? 'bg-blue-900/40 ring-2 ring-blue-500'
+          : 'bg-transparent'
+      }`}
+    >
       <Show when={props.showMarkAsRead}>
         <button
           class={`absolute top-0 right-4 ${
