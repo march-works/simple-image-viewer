@@ -4,7 +4,7 @@ import type { Component } from 'solid-js';
 import { PathSelection } from '../../features/DirectoryTree/routes/PathSelection';
 import { ImageCanvas } from '../../features/Image/ImageCanvas';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
-import { UnlistenFn, listen } from '@tauri-apps/api/event';
+import { UnlistenFn } from '@tauri-apps/api/event';
 const appWindow = getCurrentWebviewWindow();
 
 export type File = {
@@ -70,12 +70,15 @@ export const ViewerTab: Component<Props> = (props) => {
     else if (event.button === 4) moveForward();
   };
 
-  listen('viewer-tab-state-changed', (event) => {
-    const { key, viewing, tree } = event.payload as TabState;
-    if (key !== props.initialTabKey) return;
-    setViewing(viewing);
-    setTree(tree);
-  }).then((unListen) => (unListenRef = unListen));
+  // Use appWindow.listen to only receive events targeted at this window
+  appWindow
+    .listen('viewer-tab-state-changed', (event) => {
+      const { key, viewing, tree } = event.payload as TabState;
+      if (key !== props.initialTabKey) return;
+      setViewing(viewing);
+      setTree(tree);
+    })
+    .then((unListen) => (unListenRef = unListen));
 
   invoke('subscribe_dir_notification', { filepath: props.initialPath });
   invoke('request_restore_viewer_tab_state', {

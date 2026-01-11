@@ -27,8 +27,8 @@ export const ExplorerTabs = <T,>(props: Props<T>) => {
                 class={
                   'flex w-48 min-w-0 flex-row justify-between items-end rounded-t-md border-2 border-b-0 border-neutral-500 p-1 transition-colors' +
                   (tab.key === props.viewing
-                    ? ' bg-gradient-to-b from-neutral-500 to-neutral-900 text-neutral-100'
-                    : ' bg-neutral-900 text-neutral-400 hover:bg-gradient-to-b hover:from-neutral-600 hover:to-neutral-900 hover:text-neutral-300')
+                    ? ' bg-linear-to-b from-neutral-500 to-neutral-900 text-neutral-100'
+                    : ' bg-neutral-900 text-neutral-400 hover:bg-linear-to-b hover:from-neutral-600 hover:to-neutral-900 hover:text-neutral-300')
                 }
                 onMouseDown={(e) => {
                   e.preventDefault();

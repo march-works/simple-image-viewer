@@ -3,18 +3,13 @@ pub mod viewer;
 #[macro_use]
 pub mod explorer;
 
-use serde_json::Value;
-use sysinfo::System;
 use tauri::{
     async_runtime::Mutex,
     menu::{MenuBuilder, MenuItemBuilder},
-    utils::platform::current_exe,
-    Builder, Manager, WebviewUrl, WebviewWindowBuilder, Wry,
+    Builder, Emitter, Manager, WebviewUrl, WebviewWindowBuilder, Wry,
 };
-use tauri_plugin_cli::CliExt;
 
 use crate::{
-    // app::explorer::open_explorer,
     app::{
         explorer::{
             change_active_explorer_tab, change_explorer_page, change_explorer_path,
@@ -31,38 +26,11 @@ use crate::{
             subscribe_dir_notification,
         },
     },
-    grpc::{add_tab, new_window, server},
     service::app_state::{
-        remove_explorer_state, remove_viewer_state, ActiveViewer, AppState, ExplorerState,
-        ViewerState,
+        add_viewer_state, add_viewer_tab_state, remove_explorer_state, remove_viewer_state,
+        ActiveViewer, AppState, ExplorerState, ViewerState,
     },
 };
-
-fn get_running_count() -> i32 {
-    let app_exe = current_exe()
-        .unwrap_or_default()
-        .file_name()
-        .unwrap_or_default()
-        .to_str()
-        .unwrap_or_default()
-        .to_string();
-    let mut cnt = 0;
-    System::new_all()
-        .processes()
-        .iter()
-        .for_each(|(_, process)| {
-            if app_exe
-                == *process
-                    .exe()
-                    .map(|v| v.file_name().unwrap_or_default().to_str())
-                    .unwrap_or_default()
-                    .unwrap_or_default()
-            {
-                cnt += 1;
-            }
-        });
-    cnt
-}
 
 #[derive(serde::Serialize, serde::Deserialize)]
 struct SavedState {
@@ -104,79 +72,94 @@ pub fn create_viewer() -> Builder<Wry> {
         viewers: Mutex::new(saved_state.viewers.clone()),
         explorers: Mutex::new(saved_state.explorers.clone()),
     };
+    let viewers_to_restore = saved_state.viewers.clone();
+    let explorers_to_restore = saved_state.explorers.clone();
     tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            // Callback when another instance tries to start
+            // args[0] = executable path, args[1..] = arguments
+            let app = app.clone();
+
+            tokio::spawn(async move {
+                let state = app.state::<AppState>();
+
+                // Check if filepath argument exists (args[1] if present)
+                if args.len() > 1 {
+                    let filepath = args[1].clone();
+                    let label = state.active.lock().await.label.clone();
+                    if let Ok(window_state) = add_viewer_tab_state(&filepath, &label, &state).await
+                    {
+                        let _ = app.emit_to(&label, "viewer-state-changed", &window_state);
+                    }
+                    // Focus the active window
+                    if let Some(window) = app.get_webview_window(&label) {
+                        let _ = window.set_focus();
+                    }
+                } else {
+                    // No filepath argument - open new window
+                    if let Ok(label) = add_viewer_state(&state).await {
+                        let _ = WebviewWindowBuilder::new(
+                            &app,
+                            &label,
+                            WebviewUrl::App("index.html".into()),
+                        )
+                        .title("Simple Image Viewer")
+                        .maximized(true)
+                        .build();
+                    }
+                }
+            });
+        }))
         .plugin(tauri_plugin_cli::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_process::init())
-        .setup(|app| {
+        .setup(move |app| {
             // Setup menu
             let quit_item = MenuItemBuilder::with_id("quit", "Quit").build(app)?;
             let menu = MenuBuilder::new(app).item(&quit_item).build()?;
             app.set_menu(menu)?;
 
-            // when other process already running
-            if get_running_count() > 1 {
-                match app.cli().matches() {
-                    Ok(matches) => match &matches.args.get("filepath").map(|v| v.value.clone()) {
-                        Some(Value::String(val)) => {
-                            // when executed with file path
-                            tokio::spawn(add_tab::transfer(
-                                val.to_string(),
-                                app.app_handle().clone(),
-                            ));
-                        }
-                        _ => {
-                            // when executed without file path
-                            tokio::spawn(new_window::open(app.app_handle().clone()));
-                        }
-                    },
-                    Err(_) => {
-                        app.handle().exit(0);
-                    }
+            // Restore windows from saved state
+            viewers_to_restore.iter().for_each(|v| {
+                let app_handle = app.app_handle().clone();
+                let label = v.label.clone();
+                // Skip if window already exists (e.g., viewer-0 from config)
+                if app_handle.get_webview_window(&label).is_some() {
+                    return;
                 }
-            } else {
-                tokio::spawn(server::run_server(app.app_handle().clone()));
-                saved_state.viewers.into_iter().for_each(|v| {
-                    let app_handle = app.app_handle().clone();
-                    let label = v.label.clone();
-                    // Skip if window already exists (e.g., viewer-0 from config)
-                    if app_handle.get_webview_window(&label).is_some() {
-                        return;
-                    }
-                    tokio::spawn(async move {
-                        WebviewWindowBuilder::new(
-                            &app_handle,
-                            label.clone(),
-                            WebviewUrl::App("index.html".into()),
-                        )
-                        .title("Simple Image Viewer")
-                        .maximized(true)
-                        .build()
-                        .unwrap();
-                    });
+                tokio::spawn(async move {
+                    WebviewWindowBuilder::new(
+                        &app_handle,
+                        label.clone(),
+                        WebviewUrl::App("index.html".into()),
+                    )
+                    .title("Simple Image Viewer")
+                    .maximized(true)
+                    .build()
+                    .unwrap();
                 });
-                saved_state.explorers.into_iter().for_each(|v| {
-                    let app_handle = app.app_handle().clone();
-                    let label = v.label.clone();
-                    // Skip if window already exists
-                    if app_handle.get_webview_window(&label).is_some() {
-                        return;
-                    }
-                    tokio::spawn(async move {
-                        WebviewWindowBuilder::new(
-                            &app_handle,
-                            label.clone(),
-                            WebviewUrl::App("explorer.html".into()),
-                        )
-                        .title("Image Explorer")
-                        .build()
-                        .unwrap();
-                    });
+            });
+            explorers_to_restore.iter().for_each(|v| {
+                let app_handle = app.app_handle().clone();
+                let label = v.label.clone();
+                // Skip if window already exists
+                if app_handle.get_webview_window(&label).is_some() {
+                    return;
+                }
+                tokio::spawn(async move {
+                    WebviewWindowBuilder::new(
+                        &app_handle,
+                        label.clone(),
+                        WebviewUrl::App("explorer.html".into()),
+                    )
+                    .title("Image Explorer")
+                    .build()
+                    .unwrap();
                 });
-            }
+            });
             Ok(())
         })
         .on_menu_event(|app, event| {
