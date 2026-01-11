@@ -1,7 +1,7 @@
 import { ViewerTabs } from './ViewerTabs';
 import { ViewerTab, TabState } from './ViewerTab';
 import { getMatches } from '@tauri-apps/plugin-cli';
-import { listen, UnlistenFn } from '@tauri-apps/api/event';
+import { UnlistenFn } from '@tauri-apps/api/event';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { invoke } from '@tauri-apps/api/core';
 import { createSignal, onCleanup } from 'solid-js';
@@ -30,12 +30,15 @@ const Viewer = () => {
     invoke('change_active_viewer');
   };
 
-  listen('viewer-state-changed', (event) => {
-    const { active, tabs } = event.payload as ViewerState;
-    setPanes(tabs);
-    setActiveKey(active?.key);
-    appWindow.setFocus();
-  }).then((unListen) => (unListenRef = unListen));
+  // Use appWindow.listen to only receive events targeted at this window
+  appWindow
+    .listen('viewer-state-changed', (event) => {
+      const { active, tabs } = event.payload as ViewerState;
+      setPanes(tabs);
+      setActiveKey(active?.key);
+      appWindow.setFocus();
+    })
+    .then((unListen) => (unListenRef = unListen));
 
   window.addEventListener('focus', handleOnFocus, false);
   handleOnFocus();
