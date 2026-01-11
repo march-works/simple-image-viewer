@@ -11,6 +11,8 @@ use crate::service::app_state::{
     AppState, File,
 };
 
+use crate::utils::file_utils::normalize_path;
+
 /// ディレクトリ監視を開始する
 /// watcherはAppStateで管理し、同じパスへの監視は参照カウントで共有する
 #[tauri::command]
@@ -158,11 +160,40 @@ pub(crate) fn read_image_in_zip(path: String, filename: String) -> Result<String
 pub(crate) async fn change_active_viewer<'a>(
     window: WebviewWindow,
     state: State<'a, AppState>,
+    app: AppHandle,
 ) -> Result<(), String> {
     let mut label = state.active.lock().await;
     *label = ActiveViewer {
         label: window.label().to_string(),
     };
+
+    // アクティブなViewerのディレクトリを全Explorerに通知
+    let active_label = label.label.clone();
+    drop(label);
+
+    let viewers = state.viewers.lock().await;
+    let active_dir = viewers
+        .iter()
+        .find(|v| v.label == active_label)
+        .and_then(|viewer| {
+            viewer.active.as_ref().and_then(|active_tab| {
+                viewer
+                    .tabs
+                    .iter()
+                    .find(|tab| tab.key == active_tab.key)
+                    .map(|tab| normalize_path(&tab.path))
+            })
+        });
+
+    let explorers = state.explorers.lock().await;
+    for explorer in explorers.iter() {
+        let _ = app.emit_to(
+            &explorer.label,
+            "active-viewer-directory-changed",
+            active_dir.clone(),
+        );
+    }
+
     Ok(())
 }
 
@@ -222,6 +253,23 @@ pub(crate) async fn change_active_viewer_tab<'a>(
     viewer_state.active = Some(ActiveTab { key: key.clone() });
     app.emit_to(&label, "viewer-state-changed", viewer_state.clone())
         .map_err(|_| "failed to emit viewer state".to_string())?;
+
+    // アクティブなタブのディレクトリを全Explorerに通知
+    let active_dir = viewer_state
+        .tabs
+        .iter()
+        .find(|tab| tab.key == key)
+        .map(|tab| normalize_path(&tab.path));
+
+    let explorers = state.explorers.lock().await;
+    for explorer in explorers.iter() {
+        let _ = app.emit_to(
+            &explorer.label,
+            "active-viewer-directory-changed",
+            active_dir.clone(),
+        );
+    }
+
     Ok(())
 }
 
@@ -363,5 +411,84 @@ pub(crate) async fn move_backward(
         app.emit_to(&label, "viewer-tab-state-changed", tab_state.clone())
             .map_err(|_| "failed to emit viewer state".to_string())?;
     }
+    Ok(())
+}
+
+/// アクティブなViewerのアクティブなタブで開いているディレクトリパスを取得
+#[tauri::command]
+pub(crate) async fn get_active_viewer_directory(
+    state: State<'_, AppState>,
+) -> Result<Option<String>, String> {
+    let active = state.active.lock().await;
+    let viewers = state.viewers.lock().await;
+
+    let viewer_state = viewers
+        .iter()
+        .find(|v| v.label == active.label)
+        .ok_or_else(|| "active viewer not found".to_string())?;
+
+    let directory = viewer_state.active.as_ref().and_then(|active_tab| {
+        viewer_state
+            .tabs
+            .iter()
+            .find(|tab| tab.key == active_tab.key)
+            .map(|tab| normalize_path(&tab.path))
+    });
+
+    Ok(directory)
+}
+
+/// 指定されたディレクトリを開いている全てのViewerタブを閉じる
+#[tauri::command]
+pub(crate) async fn close_viewer_tabs_by_directory(
+    directory: String,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    let normalized_dir = normalize_path(&directory);
+    let mut viewers = state.viewers.lock().await;
+
+    // 全てのViewerウィンドウを走査
+    for viewer_state in viewers.iter_mut() {
+        // 閉じるべきタブを特定
+        let tabs_to_close: Vec<String> = viewer_state
+            .tabs
+            .iter()
+            .filter(|tab| normalize_path(&tab.path) == normalized_dir)
+            .map(|tab| tab.key.clone())
+            .collect();
+
+        if tabs_to_close.is_empty() {
+            continue;
+        }
+
+        // タブを閉じる（後ろから削除してインデックスの問題を回避）
+        for key in tabs_to_close.iter() {
+            if let Some(index) = viewer_state.tabs.iter().position(|t| &t.key == key) {
+                viewer_state.tabs.remove(index);
+            }
+        }
+
+        // アクティブなタブが閉じられた場合、新しいアクティブタブを設定
+        if !viewer_state.tabs.is_empty() {
+            if let Some(active_tab) = &viewer_state.active {
+                if tabs_to_close.contains(&active_tab.key) {
+                    let new_active_key = viewer_state.tabs[0].key.clone();
+                    viewer_state.active = Some(ActiveTab {
+                        key: new_active_key,
+                    });
+                }
+            }
+        } else {
+            viewer_state.active = None;
+        }
+
+        let label = viewer_state.label.clone();
+        let viewer_state_clone = viewer_state.clone();
+
+        app.emit_to(&label, "viewer-state-changed", viewer_state_clone)
+            .map_err(|_| "failed to emit viewer state".to_string())?;
+    }
+
     Ok(())
 }

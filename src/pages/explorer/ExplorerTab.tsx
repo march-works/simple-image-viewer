@@ -41,12 +41,27 @@ export const ExplorerTab: Component<Props> = (props) => {
   const [folders, setFolders] = createSignal<Thumbnail[]>([]);
   const [pagination, setPagination] = createSignal<[number, number]>([1, 1]);
   const [isLoading, setIsLoading] = createSignal<boolean>(false);
+  const [activeViewerDir, setActiveViewerDir] = createSignal<
+    string | undefined
+  >();
   let unListenRef: UnlistenFn | undefined = undefined;
+  let activeViewerDirListenRef: UnlistenFn | undefined = undefined;
   let divRef!: HTMLDivElement;
+
+  // アクティブなViewerのアクティブなタブのディレクトリを取得
+  const updateActiveViewerDirectory = async () => {
+    try {
+      const dir = await invoke<string | null>('get_active_viewer_directory');
+      setActiveViewerDir(dir ?? undefined);
+    } catch {
+      // エラーは無視（Viewerが開いていない場合など）
+      setActiveViewerDir(undefined);
+    }
+  };
 
   // onMountで非同期リスナー登録を確実に待つ
   onMount(async () => {
-    // イベントリスナーを登録し、確実にunListenRefに保存
+    // タブ状態変更イベントリスナー
     unListenRef = await appWindow.listen(
       'explorer-tab-state-changed',
       (event) => {
@@ -65,10 +80,23 @@ export const ExplorerTab: Component<Props> = (props) => {
       },
     );
 
+    // アクティブなViewerディレクトリ変更イベントリスナー
+    activeViewerDirListenRef = await appWindow.listen(
+      'active-viewer-directory-changed',
+      (event) => {
+        const dir = event.payload as string | null;
+        setActiveViewerDir(dir ?? undefined);
+      },
+    );
+
+    // 初回読み込み
     invoke('request_restore_explorer_tab_state', {
       label: appWindow.label,
       key: props.tabKey,
     });
+
+    // 初回のアクティブディレクトリを取得
+    updateActiveViewerDirectory();
   });
 
   createEffect(
@@ -115,6 +143,18 @@ export const ExplorerTab: Component<Props> = (props) => {
       to,
       label: appWindow.label,
     });
+  };
+
+  const closeViewerTabsForDirectory = async (directory: string) => {
+    try {
+      await invoke('close_viewer_tabs_by_directory', { directory });
+    } catch (error) {
+      console.error('Failed to close viewer tabs:', error);
+    }
+  };
+
+  const normalizePathForComparison = (path: string): string => {
+    return path.replace(/\\/g, '/').toLowerCase();
   };
 
   const resetTab = () => {
@@ -184,6 +224,7 @@ export const ExplorerTab: Component<Props> = (props) => {
     document.removeEventListener('mouseup', handleOnButtonDown, false);
     // Tauriイベントリスナーを解除
     unListenRef?.();
+    activeViewerDirListenRef?.();
   });
 
   return (
@@ -222,12 +263,18 @@ export const ExplorerTab: Component<Props> = (props) => {
               <Folder
                 thumb={item}
                 showMarkAsRead={!!transferPath()}
+                isHighlighted={
+                  activeViewerDir() !== undefined &&
+                  normalizePathForComparison(item.path) === activeViewerDir()
+                }
                 onMarkedAsRead={(path) => {
                   const to = transferPath();
                   if (!to) {
                     return;
                   }
                   transfer(path, to);
+                  // 転送後にViewerのタブを閉じる
+                  closeViewerTabsForDirectory(path);
                 }}
                 onClick={onClick}
               />

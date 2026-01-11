@@ -20,11 +20,11 @@ use crate::{
         },
         viewer::{
             change_active_viewer, change_active_viewer_tab, change_viewing,
-            get_filenames_inner_zip, move_backward, move_forward, open_file_image,
-            open_image_dialog, open_new_viewer, open_new_viewer_tab, read_image_in_zip,
-            refresh_viewer_tab_tree, remove_viewer_tab, request_restore_viewer_state,
-            request_restore_viewer_tab_state, subscribe_dir_notification,
-            unsubscribe_dir_notification,
+            close_viewer_tabs_by_directory, get_active_viewer_directory, get_filenames_inner_zip,
+            move_backward, move_forward, open_file_image, open_image_dialog, open_new_viewer,
+            open_new_viewer_tab, read_image_in_zip, refresh_viewer_tab_tree, remove_viewer_tab,
+            request_restore_viewer_state, request_restore_viewer_tab_state,
+            subscribe_dir_notification, unsubscribe_dir_notification,
         },
     },
     service::app_state::{
@@ -270,5 +270,7 @@ pub fn create_viewer() -> Builder<Wry> {
             move_backward,
             request_restore_viewer_tab_state,
             refresh_viewer_tab_tree,
+            get_active_viewer_directory,
+            close_viewer_tabs_by_directory,
         ])
 }
