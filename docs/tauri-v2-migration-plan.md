@@ -250,12 +250,39 @@ Phase 1完了後に実施:
 
 ---
 
-## Phase 3: その他ライブラリの更新 (後続フェーズ)
+## Phase 3: その他ライブラリの更新 ✅ 完了
 
-Phase 2完了後、必要に応じて実施:
+Phase 2完了後に実施:
 
-- eslint の最新版 (v9.x への移行)
-- tailwindcss の最新版 (v4.x への移行)
+| パッケージ | 以前 | 更新後 |
+|---|---|---|
+| eslint | 8.39.0 | 9.39.2 |
+| eslint-plugin-solid | 0.7.4 | 0.14.5 |
+| tailwindcss | 3.3.1 | 4.1.18 |
+| typescript-eslint | - | 8.52.0 |
+| globals | - | 17.0.0 |
+| @tailwindcss/vite | - | 4.1.18 |
+
+### 削除したパッケージ
+
+- `@typescript-eslint/eslint-plugin` (typescript-eslintに統合)
+- `@typescript-eslint/parser` (typescript-eslintに統合)
+- `eslint-config-prettier` (ESLint 9.xでは不要)
+- `@types/eslint` (ESLint 9.xには型定義が含まれる)
+- `autoprefixer` (Tailwind CSS 4.xに統合)
+- `postcss` (Tailwind CSS 4.xに統合)
+
+### 削除した設定ファイル
+
+- `.eslintrc.json` → `eslint.config.js` (Flat Config形式)
+- `tailwind.config.js` (Viteプラグインに移行)
+- `postcss.config.js` (不要)
+
+### 実施内容
+
+1. **ESLint 9.x 移行**: Flat Config（`eslint.config.js`）形式に移行、typescript-eslint統合パッケージを使用
+2. **Tailwind CSS 4.x 移行**: ViteプラグインとしてCSSベースの設定に移行
+3. **package.json**: `"type": "module"` を追加してESM対応
 
 
 ---
@@ -294,3 +321,4 @@ Phase 2完了後、必要に応じて実施:
 |---|---|
 | 2026-01-12 | 初版作成 |
 | 2026-01-12 | Phase 2 完了: Vite 7.3.1, TypeScript 5.9.3, Prettier 3.7.4, SolidJS 1.9.10 |
+| 2026-01-12 | Phase 3 完了: ESLint 9.39.2, Tailwind CSS 4.1.18 |
