@@ -18,6 +18,16 @@
     "lint-fix": "pnpm run lint && pnpm run format",
     "prepare": "husky install"
   },
+  "lint-staged": {
+    "src/**/*.{js,jsx,ts,tsx,css,md,json}": [
+      "prettier --write",
+      "eslint --fix"
+    ],
+    "src-tauri/**/*.rs": [
+      "cd src-tauri && cargo fmt --",
+      "cd src-tauri && cargo clippy --fix --allow-dirty --allow-staged --"
+    ]
+  },
   "license": "MIT",
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.18",
