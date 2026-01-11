@@ -101,15 +101,15 @@ export const ImageCanvas: Component<Props> = (props) => {
 
   const [data] = createResource(
     () => props.viewing,
-    () =>
-      match(props.viewing?.file_type)
-         
-        .with('Image', () => convertToLocalPath(props.viewing!))
-         
-        .with('Video', () => convertToLocalPath(props.viewing!))
-         
-        .with('Zip', () => readImageInZip(props.viewing!))
-        .otherwise(() => ''),
+    () => {
+      const { viewing } = props;
+      if (!viewing) return '';
+      return match(viewing.file_type)
+        .with('Image', () => convertToLocalPath(viewing))
+        .with('Video', () => convertToLocalPath(viewing))
+        .with('Zip', () => readImageInZip(viewing))
+        .otherwise(() => '');
+    },
   );
 
   createEffect(
