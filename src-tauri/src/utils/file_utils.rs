@@ -119,3 +119,8 @@ pub(crate) fn get_any_extensions() -> Vec<String> {
     extensions.extend(get_compressed_extensions());
     extensions
 }
+
+/// パスを正規化（Windowsのバックスラッシュを統一）
+pub(crate) fn normalize_path(path: &str) -> String {
+    path.replace('\\', "/").to_lowercase()
+}
