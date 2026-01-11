@@ -1,7 +1,7 @@
 import { createSignal, onCleanup } from 'solid-js';
 import { ExplorerTabs } from './ExplorerTabs';
 import { ExplorerTab, TabState } from './ExplorerTab';
-import { UnlistenFn, listen } from '@tauri-apps/api/event';
+import { UnlistenFn } from '@tauri-apps/api/event';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { invoke } from '@tauri-apps/api/core';
 const appWindow = getCurrentWebviewWindow();
@@ -18,12 +18,15 @@ const Explorer = () => {
   const [panes, setPanes] = createSignal<TabState[]>([]);
   let unListenRef: UnlistenFn | undefined = undefined;
 
-  listen('explorer-state-changed', (event) => {
-    const { active, tabs } = event.payload as ExplorerState;
-    setPanes(tabs);
-    setActiveKey(active?.key);
-    appWindow.setFocus();
-  }).then((unListen) => (unListenRef = unListen));
+  // Use appWindow.listen to only receive events targeted at this window
+  appWindow
+    .listen('explorer-state-changed', (event) => {
+      const { active, tabs } = event.payload as ExplorerState;
+      setPanes(tabs);
+      setActiveKey(active?.key);
+      appWindow.setFocus();
+    })
+    .then((unListen) => (unListenRef = unListen));
 
   invoke('request_restore_explorer_state', { label: appWindow.label });
 

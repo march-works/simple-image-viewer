@@ -444,11 +444,8 @@ pub(crate) fn find_path_in_tree(tree: &Vec<FileTree>, path: &String) -> Option<F
     None
 }
 
-pub(crate) fn get_next_in_tree(viewing: &String, tree: &Vec<FileTree>) -> Option<File> {
-    let (files, dirs): (Vec<_>, Vec<_>) = tree.iter().partition(|v| match v {
-        FileTree::File(_) => true,
-        _ => false,
-    });
+pub(crate) fn get_next_in_tree(viewing: &String, tree: &[FileTree]) -> Option<File> {
+    let (files, dirs): (Vec<_>, Vec<_>) = tree.iter().partition(|v| matches!(v, FileTree::File(_)));
     let files: Vec<_> = files
         .iter()
         .map(|v| match v {
@@ -474,8 +471,7 @@ pub(crate) fn get_next_in_tree(viewing: &String, tree: &Vec<FileTree>) -> Option
         .collect();
     let idx = files.iter().position(|v| v.key == *viewing);
     let length = files.len();
-    if idx.is_some() {
-        let idx = idx.unwrap();
+    if let Some(idx) = idx {
         let next_idx = (idx + 1) % length;
         return files.get(next_idx).cloned();
     }
@@ -489,11 +485,8 @@ pub(crate) fn get_next_in_tree(viewing: &String, tree: &Vec<FileTree>) -> Option
     None
 }
 
-pub(crate) fn get_prev_in_tree(viewing: &String, tree: &Vec<FileTree>) -> Option<File> {
-    let (files, dirs): (Vec<_>, Vec<_>) = tree.iter().partition(|v| match v {
-        FileTree::File(_) => true,
-        _ => false,
-    });
+pub(crate) fn get_prev_in_tree(viewing: &String, tree: &[FileTree]) -> Option<File> {
+    let (files, dirs): (Vec<_>, Vec<_>) = tree.iter().partition(|v| matches!(v, FileTree::File(_)));
     let files: Vec<_> = files
         .iter()
         .map(|v| match v {
@@ -519,8 +512,7 @@ pub(crate) fn get_prev_in_tree(viewing: &String, tree: &Vec<FileTree>) -> Option
         .collect();
     let idx = files.iter().position(|v| v.key == *viewing);
     let length = files.len();
-    if idx.is_some() {
-        let idx = idx.unwrap();
+    if let Some(idx) = idx {
         let next_idx = (idx + length - 1) % length;
         return files.get(next_idx).cloned();
     }
