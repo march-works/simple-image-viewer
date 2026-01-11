@@ -1,11 +1,11 @@
-import { Component, JSXElement } from 'solid-js';
+import type { Component, JSX } from 'solid-js';
 
 type Props = {
   ref?: HTMLDivElement;
   class?: string;
   isSelected?: boolean;
   onClick: () => void;
-  children: JSXElement;
+  children: JSX.Element;
 };
 
 export const NodeBaseStyle: Component<Props> = (props) => {

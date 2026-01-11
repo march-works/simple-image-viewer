@@ -1,10 +1,11 @@
-import { Component, For, createMemo, onCleanup } from 'solid-js';
+import { For, createMemo, onCleanup } from 'solid-js';
+import type { Component } from 'solid-js';
 import { P, match } from 'ts-pattern';
 import { DirectoryNode } from './DirectoryNode';
 import { ImageNode } from './ImageNode';
 import { VideoNode } from './VideoNode';
 import { ZipNode } from './ZipNode';
-import { FileTree, File } from '../../../pages/viewer/ViewerTab';
+import type { FileTree, File } from '../../../pages/viewer/ViewerTab';
 import equal from 'fast-deep-equal';
 
 type Props = {

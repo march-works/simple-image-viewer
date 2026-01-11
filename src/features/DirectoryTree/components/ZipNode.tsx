@@ -1,5 +1,6 @@
-import { Component, createEffect } from 'solid-js';
-import { File } from '../../../pages/viewer/ViewerTab';
+import { createEffect } from 'solid-js';
+import type { Component } from 'solid-js';
+import type { File } from '../../../pages/viewer/ViewerTab';
 import { NodeBaseStyle } from './NodeBaseStyle';
 import { FaSolidImage } from 'solid-icons/fa';
 

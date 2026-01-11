@@ -227,15 +227,26 @@ fn main() {
 
 ---
 
-## Phase 2: Vite & TypeScript アップデート (後続フェーズ)
+## Phase 2: Vite & TypeScript アップデート ✅ 完了
 
-Phase 1完了後、別途実施予定:
+Phase 1完了後に実施:
 
-| パッケージ | 現在 | 目標 |
+| パッケージ | 以前 | 更新後 |
 |---|---|---|
-| vite | 3.2.6 | 5.x |
-| typescript | 4.9.5 | 5.x |
-| prettier | 2.8.7 | 3.x |
+| vite | 3.2.6 | 7.3.1 |
+| vite-plugin-solid | 2.7.0 | 2.11.10 |
+| typescript | 4.9.5 | 5.9.3 |
+| prettier | 2.8.7 | 3.7.4 |
+| solid-js | 1.7.3 | 1.9.10 |
+| @solidjs/router | 0.8.2 | 0.15.4 |
+| @types/node | 18.15.13 | 25.0.6 |
+| Node.js | 20.11.1 | 22.21.1 |
+
+### 実施内容
+
+1. **Node.js アップグレード**: Vite 7.x の要件（Node.js 20.19+ または 22.12+）を満たすため、nvm で Node.js 22.21.1 にアップグレード
+2. **vite.config.ts 更新**: `__dirname` を ESM 対応に変更（`fileURLToPath` 使用）
+3. **tsconfig.json 更新**: `moduleResolution: "Bundler"` に変更、`verbatimModuleSyntax` 追加
 
 ---
 
@@ -243,9 +254,9 @@ Phase 1完了後、別途実施予定:
 
 Phase 2完了後、必要に応じて実施:
 
-- solid-js / @solidjs/router の最新版
-- eslint の最新版
-- tailwindcss の最新版
+- eslint の最新版 (v9.x への移行)
+- tailwindcss の最新版 (v4.x への移行)
+
 
 ---
 
@@ -282,3 +293,4 @@ Phase 2完了後、必要に応じて実施:
 | 日付 | 内容 |
 |---|---|
 | 2026-01-12 | 初版作成 |
+| 2026-01-12 | Phase 2 完了: Vite 7.3.1, TypeScript 5.9.3, Prettier 3.7.4, SolidJS 1.9.10 |
