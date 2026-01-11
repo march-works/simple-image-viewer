@@ -16,7 +16,7 @@ import { FaSolidFolderOpen } from 'solid-icons/fa';
 import { RiDocumentFolderTransferFill } from 'solid-icons/ri';
 import { UnlistenFn, listen } from '@tauri-apps/api/event';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
-const appWindow = getCurrentWebviewWindow()
+const appWindow = getCurrentWebviewWindow();
 
 export type TabState = {
   title: string;

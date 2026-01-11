@@ -7,6 +7,7 @@ use serde_json::Value;
 use sysinfo::System;
 use tauri::{
     async_runtime::Mutex,
+    menu::{MenuBuilder, MenuItemBuilder},
     utils::platform::current_exe,
     Builder, Manager, WebviewUrl, WebviewWindowBuilder, Wry,
 };
@@ -111,13 +112,21 @@ pub fn create_viewer() -> Builder<Wry> {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_process::init())
         .setup(|app| {
+            // Setup menu
+            let quit_item = MenuItemBuilder::with_id("quit", "Quit").build(app)?;
+            let menu = MenuBuilder::new(app).item(&quit_item).build()?;
+            app.set_menu(menu)?;
+            
             // when other process already running
             if get_running_count() > 1 {
                 match app.cli().matches() {
                     Ok(matches) => match &matches.args.get("filepath").map(|v| v.value.clone()) {
                         Some(Value::String(val)) => {
                             // when executed with file path
-                            tokio::spawn(add_tab::transfer(val.to_string(), app.app_handle().clone()));
+                            tokio::spawn(add_tab::transfer(
+                                val.to_string(),
+                                app.app_handle().clone(),
+                            ));
                         }
                         _ => {
                             // when executed without file path
@@ -169,6 +178,37 @@ pub fn create_viewer() -> Builder<Wry> {
                 });
             }
             Ok(())
+        })
+        .on_menu_event(|app, event| {
+            if event.id().as_ref() == "quit" {
+                let app = app.clone();
+                tokio::spawn(async move {
+                    let state = app.state::<AppState>();
+                    let mut active = state.active.lock().await.clone();
+                    let mut viewers = state.viewers.lock().await.clone();
+                    if !viewers.is_empty() {
+                        active.label = "viewer-0".to_string();
+                        viewers[0].label = "viewer-0".to_string();
+                    }
+                    let explorers = state.explorers.lock().await.clone();
+                    let saved_state = SavedState {
+                        count: *state.count.lock().await,
+                        active,
+                        viewers,
+                        explorers,
+                    };
+                    let dir = dirs::data_dir().unwrap_or_default();
+                    let app_dir = dir.join("simple-image-viewer");
+                    let _ = std::fs::create_dir_all(&app_dir);
+                    let path = app_dir.join("state.json");
+                    let _ = std::fs::write(
+                        path.clone(),
+                        serde_json::to_string(&saved_state).unwrap_or_default(),
+                    );
+                    println!("state saved to {:?}", path);
+                    std::process::exit(0);
+                });
+            }
         })
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {

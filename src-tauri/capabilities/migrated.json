@@ -3,10 +3,13 @@
   "description": "permissions that were migrated from v1",
   "local": true,
   "windows": [
-    "main"
+    "main",
+    "viewer-*",
+    "explorer-*"
   ],
   "permissions": [
     "core:default",
+    "core:event:default",
     "fs:allow-read-file",
     "fs:allow-write-file",
     "fs:allow-read-dir",

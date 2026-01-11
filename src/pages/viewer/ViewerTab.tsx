@@ -4,7 +4,7 @@ import { PathSelection } from '../../features/DirectoryTree/routes/PathSelection
 import { ImageCanvas } from '../../features/Image/ImageCanvas';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { UnlistenFn, listen } from '@tauri-apps/api/event';
-const appWindow = getCurrentWebviewWindow()
+const appWindow = getCurrentWebviewWindow();
 
 export type File = {
   key: string;

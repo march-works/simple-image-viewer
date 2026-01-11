@@ -4,7 +4,7 @@ import { ExplorerTab, TabState } from './ExplorerTab';
 import { UnlistenFn, listen } from '@tauri-apps/api/event';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { invoke } from '@tauri-apps/api/core';
-const appWindow = getCurrentWebviewWindow()
+const appWindow = getCurrentWebviewWindow();
 
 type ExplorerState = {
   active?: {
