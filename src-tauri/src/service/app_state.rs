@@ -1,7 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::fs::read_dir;
 use sysinfo::Disks;
-use tauri::{api::dialog::blocking::FileDialogBuilder, State};
+use tauri::State;
+use tauri_plugin_dialog::DialogExt;
 use tokio::sync::Mutex;
 
 use crate::utils::file_utils::{
@@ -291,16 +292,18 @@ pub(crate) async fn remove_explorer_tab_state(
     Ok(explorer_state.clone())
 }
 
-pub(crate) fn open_file_pick_dialog() -> Result<String, String> {
+pub(crate) async fn open_file_pick_dialog(app: &tauri::AppHandle) -> Result<String, String> {
     let extensions = get_any_extensions();
     let extensions: Vec<&str> = extensions.iter().map(|s| s.as_str()).collect();
-    let filepath = FileDialogBuilder::new()
+    let filepath = app
+        .dialog()
+        .file()
         .add_filter("File", &extensions)
-        .pick_file();
-    return match filepath {
-        Some(path) => Ok(path.to_string_lossy().to_string()),
+        .blocking_pick_file();
+    match filepath {
+        Some(path) => Ok(path.to_string()),
         None => Err("no file selected".to_string()),
-    };
+    }
 }
 
 fn get_file_tree(path: &String, key_count: &mut i32) -> Vec<FileTree> {

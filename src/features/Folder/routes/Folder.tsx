@@ -2,7 +2,7 @@ import { Component, Show, createResource, createSignal } from 'solid-js';
 import { Thumbnail } from '../types/Thumbnail';
 import fallback from '../../../assets/noimage.png';
 import { FaSolidCheck } from 'solid-icons/fa';
-import { convertFileSrc } from '@tauri-apps/api/tauri';
+import { convertFileSrc } from '@tauri-apps/api/core';
 
 type Props = {
   thumb: Thumbnail;

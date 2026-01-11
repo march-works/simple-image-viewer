@@ -1,5 +1,5 @@
 use fs_extra::dir::{move_dir, CopyOptions};
-use tauri::{AppHandle, Manager, State};
+use tauri::{AppHandle, Emitter, State, WebviewUrl, WebviewWindowBuilder};
 
 #[allow(unused_imports)]
 use tokio_stream::StreamExt;
@@ -59,7 +59,7 @@ pub(crate) async fn open_new_explorer<'a>(
 ) -> Result<(), String> {
     let label = add_explorer_state(&state).await?;
     let explorer_state = add_explorer_tab_state(&label, &state).await?;
-    tauri::WindowBuilder::new(&app, &label, tauri::WindowUrl::App("explorer.html".into()))
+    WebviewWindowBuilder::new(&app, &label, WebviewUrl::App("explorer.html".into()))
         .title("Image Explorer")
         .build()
         .map_err(|_| "system unavailable".to_string())?;
