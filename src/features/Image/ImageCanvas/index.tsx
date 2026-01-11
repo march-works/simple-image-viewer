@@ -103,11 +103,11 @@ export const ImageCanvas: Component<Props> = (props) => {
     () => props.viewing,
     () =>
       match(props.viewing?.file_type)
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+         
         .with('Image', () => convertToLocalPath(props.viewing!))
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+         
         .with('Video', () => convertToLocalPath(props.viewing!))
-        // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+         
         .with('Zip', () => readImageInZip(props.viewing!))
         .otherwise(() => ''),
   );

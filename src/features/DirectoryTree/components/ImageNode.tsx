@@ -1,4 +1,4 @@
-import { createEffect, onCleanup } from 'solid-js';
+import { createEffect } from 'solid-js';
 import type { Component } from 'solid-js';
 import { NodeBaseStyle } from './NodeBaseStyle';
 import { FaSolidImage } from 'solid-icons/fa';
