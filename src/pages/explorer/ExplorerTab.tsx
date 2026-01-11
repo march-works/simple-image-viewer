@@ -53,7 +53,6 @@ export const ExplorerTab: Component<Props> = (props) => {
 
   invoke('request_restore_explorer_tab_state', {
     label: appWindow.label,
-     
     key: props.tabKey,
   });
 
