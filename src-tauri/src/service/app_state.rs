@@ -294,17 +294,20 @@ pub(crate) async fn remove_explorer_tab_state(
 
 pub(crate) async fn open_file_pick_dialog(app: &tauri::AppHandle) -> Result<String, String> {
     use tokio::sync::oneshot;
-    
+
     let extensions = get_any_extensions();
     let (tx, rx) = oneshot::channel();
-    
+
     app.dialog()
         .file()
-        .add_filter("File", &extensions.iter().map(|s| s.as_str()).collect::<Vec<_>>())
+        .add_filter(
+            "File",
+            &extensions.iter().map(|s| s.as_str()).collect::<Vec<_>>(),
+        )
         .pick_file(move |file_path| {
             let _ = tx.send(file_path);
         });
-    
+
     match rx.await {
         Ok(Some(path)) => Ok(path.to_string()),
         Ok(None) => Err("no file selected".to_string()),
