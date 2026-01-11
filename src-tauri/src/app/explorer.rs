@@ -1,82 +1,16 @@
 use fs_extra::dir::{move_dir, CopyOptions};
-use notify::{recommended_watcher, RecursiveMode, Watcher};
-use std::path::Path;
+use notify::RecursiveMode;
 use tauri::{AppHandle, Emitter, State, WebviewUrl, WebviewWindowBuilder};
 
 use crate::service::app_state::{
-    add_explorer_state, add_explorer_tab_state, clear_thumbnail_cache_for_dir,
-    explore_path_with_count, remove_explorer_tab_state, reset_explorer_tab_state, ActiveTab,
-    AppState,
+    add_explorer_state, add_explorer_tab_state, explore_path_with_count, remove_explorer_tab_state,
+    reset_explorer_tab_state, ActiveTab, AppState,
+};
+use crate::utils::watcher_utils::{
+    create_explorer_watcher_callback, subscribe_directory, unsubscribe_directory,
 };
 
-/// アクティブタブのインデックスを取得するヘルパー関数
-async fn get_active_tab_index(
-    label: &str,
-    state: &State<'_, AppState>,
-) -> Result<(usize, String), String> {
-    let explorers = state.explorers.lock().await;
-    let explorer_state = explorers
-        .iter()
-        .find(|w| w.label == label)
-        .ok_or_else(|| "explorer not found".to_string())?;
-    let active_key = explorer_state
-        .active
-        .as_ref()
-        .ok_or_else(|| "no active tab".to_string())?
-        .key
-        .clone();
-    let index = explorer_state
-        .tabs
-        .iter()
-        .position(|t| t.key == active_key)
-        .ok_or_else(|| "tab not found".to_string())?;
-    Ok((index, active_key))
-}
-
-/// 指定されたキーのタブインデックスを取得するヘルパー関数
-async fn get_tab_index_by_key(
-    label: &str,
-    key: &str,
-    state: &State<'_, AppState>,
-) -> Result<usize, String> {
-    let explorers = state.explorers.lock().await;
-    let explorer_state = explorers
-        .iter()
-        .find(|w| w.label == label)
-        .ok_or_else(|| "explorer not found".to_string())?;
-    explorer_state
-        .tabs
-        .iter()
-        .position(|t| t.key == key)
-        .ok_or_else(|| "tab not found".to_string())
-}
-
-/// タブの状態を更新してイベントを発行するヘルパー関数
-async fn update_tab_and_emit(
-    label: &str,
-    index: usize,
-    page: usize,
-    thumbnails: Vec<crate::service::app_state::Thumbnail>,
-    total_pages: usize,
-    state: &State<'_, AppState>,
-    app: &AppHandle,
-) -> Result<(), String> {
-    let tab_state = {
-        let mut explorers = state.explorers.lock().await;
-        let explorer_state = explorers
-            .iter_mut()
-            .find(|w| w.label == label)
-            .ok_or_else(|| "explorer not found".to_string())?;
-        explorer_state.tabs[index].page = page;
-        explorer_state.tabs[index].folders = thumbnails;
-        explorer_state.tabs[index].end = total_pages;
-        explorer_state.tabs[index].clone()
-    };
-
-    app.emit_to(label, "explorer-tab-state-changed", &tab_state)
-        .map_err(|_| "failed to emit explorer state".to_string())?;
-    Ok(())
-}
+use super::explorer_helpers::{get_active_tab_index, get_tab_index_by_key, update_tab_and_emit};
 
 #[tauri::command]
 pub(crate) async fn transfer_folder(
@@ -423,47 +357,10 @@ pub(crate) async fn subscribe_explorer_dir_notification(
     state: State<'_, AppState>,
     app: AppHandle,
 ) -> Result<(), String> {
-    let mut watchers = state.watchers.lock().await;
+    let callback =
+        create_explorer_watcher_callback(app, dir_path.clone(), state.thumbnail_cache.clone());
 
-    // 既に同じパスの監視がある場合は参照カウントを増やすだけ
-    if let Some((_, ref_count)) = watchers.get_mut(&dir_path) {
-        *ref_count += 1;
-        return Ok(());
-    }
-
-    // 新しいwatcherを作成
-    let path_inner = dir_path.clone();
-    let cache = state.thumbnail_cache.clone();
-    let watcher = recommended_watcher(move |res| match res {
-        Ok(_) => {
-            // ディレクトリ変更時にキャッシュをクリア
-            let cache_clone = cache.clone();
-            let path_clone = path_inner.clone();
-            tokio::spawn(async move {
-                clear_thumbnail_cache_for_dir(&path_clone, cache_clone).await;
-            });
-
-            // フロントエンドに通知
-            app.emit("explorer-directory-changed", &path_inner)
-                .unwrap_or_default();
-        }
-        Err(_) => {
-            app.emit(
-                "explorer-directory-watch-error",
-                "Error occurred while directory watching",
-            )
-            .unwrap_or_default();
-        }
-    })
-    .map_err(|e| format!("failed to create watcher: {}", e))?;
-
-    let mut watcher = watcher;
-    watcher
-        .watch(Path::new(&dir_path), RecursiveMode::NonRecursive)
-        .map_err(|e| format!("failed to watch directory: {}", e))?;
-
-    watchers.insert(dir_path, (watcher, 1));
-    Ok(())
+    subscribe_directory(dir_path, &state, RecursiveMode::NonRecursive, callback).await
 }
 
 /// Explorerのディレクトリ監視を解除する
@@ -473,15 +370,7 @@ pub(crate) async fn unsubscribe_explorer_dir_notification(
     dir_path: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let mut watchers = state.watchers.lock().await;
-
-    if let Some((_, ref_count)) = watchers.get_mut(&dir_path) {
-        *ref_count -= 1;
-        if *ref_count == 0 {
-            watchers.remove(&dir_path);
-        }
-    }
-    Ok(())
+    unsubscribe_directory(dir_path, &state).await
 }
 
 /// ディレクトリ変更通知を受けてExplorerタブの内容を再読み込みする

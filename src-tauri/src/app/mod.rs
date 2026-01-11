@@ -2,6 +2,7 @@
 pub mod viewer;
 #[macro_use]
 pub mod explorer;
+pub mod explorer_helpers;
 
 use tauri::{
     async_runtime::Mutex,
