@@ -1,4 +1,4 @@
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 use tonic::{Request, Response, Status};
 
 use crate::{
@@ -29,7 +29,7 @@ impl NewWindowOpened for Opener {
         let label = add_viewer_state(&state)
             .await
             .map_err(|_| Status::failed_precondition("system unavailable"))?;
-        tauri::WindowBuilder::new(&self.app, label, tauri::WindowUrl::App("index.html".into()))
+        WebviewWindowBuilder::new(&self.app, label, WebviewUrl::App("index.html".into()))
             .title("Simple Image Viewer")
             .maximized(true)
             .build()

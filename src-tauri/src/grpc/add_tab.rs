@@ -1,4 +1,4 @@
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 use tonic::{Request, Response, Status};
 
 use crate::{
@@ -37,7 +37,7 @@ impl FilePathTransfer for Transferer {
             .emit_to(label.as_str(), "viewer-state-changed", window_state)
             .unwrap_or_else(|_| {
                 self.app
-                    .emit_all("viewer-state-changed", window_state)
+                    .emit("viewer-state-changed", window_state)
                     .unwrap_or(())
             });
         let response = FilePathTransferResponse { result: 5 };
