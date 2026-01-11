@@ -43,7 +43,7 @@ const Viewer = () => {
   invoke('request_restore_viewer_state', { label: appWindow.label });
 
   getMatches().then((matches) => {
-    const filepath = matches.args.filepath.value;
+    const filepath = matches.args.filepath?.value;
     typeof filepath === 'string' &&
       invoke('open_new_viewer_tab', { path: filepath });
   });
