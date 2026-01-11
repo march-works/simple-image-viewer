@@ -1,4 +1,4 @@
-import { For, createMemo, onCleanup } from 'solid-js';
+import { For, createMemo } from 'solid-js';
 import type { Component } from 'solid-js';
 import { P, match } from 'ts-pattern';
 import { DirectoryNode } from './DirectoryNode';
