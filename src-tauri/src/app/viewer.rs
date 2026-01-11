@@ -1,8 +1,7 @@
 use base64::{engine::general_purpose, Engine as _};
-use notify::{recommended_watcher, RecursiveMode, Watcher};
+use notify::RecursiveMode;
 use std::fs::File as StdFile;
 use std::io::{BufReader, Read};
-use std::path::Path;
 use tauri::{AppHandle, Emitter, State, WebviewWindow};
 
 use crate::service::app_state::{
@@ -12,6 +11,9 @@ use crate::service::app_state::{
 };
 
 use crate::utils::file_utils::normalize_path;
+use crate::utils::watcher_utils::{
+    create_viewer_watcher_callback, subscribe_directory, unsubscribe_directory,
+};
 
 /// ディレクトリ監視を開始する
 /// watcherはAppStateで管理し、同じパスへの監視は参照カウントで共有する
@@ -22,38 +24,9 @@ pub(crate) async fn subscribe_dir_notification(
     state: State<'_, AppState>,
     app: AppHandle,
 ) -> Result<(), String> {
-    let mut watchers = state.watchers.lock().await;
+    let callback = create_viewer_watcher_callback(app, filepath.clone());
 
-    // 既に同じパスの監視がある場合は参照カウントを増やすだけ
-    if let Some((_, ref_count)) = watchers.get_mut(&filepath) {
-        *ref_count += 1;
-        return Ok(());
-    }
-
-    // 新しいwatcherを作成
-    let path_inner = filepath.clone();
-    let watcher = recommended_watcher(move |res| match res {
-        Ok(_) => {
-            app.emit("directory-tree-changed", &path_inner)
-                .unwrap_or_default();
-        }
-        Err(_) => {
-            app.emit(
-                "directory-watch-error",
-                "Error occured while directory watching",
-            )
-            .unwrap_or_default();
-        }
-    })
-    .map_err(|e| format!("failed to create watcher: {}", e))?;
-
-    let mut watcher = watcher;
-    watcher
-        .watch(Path::new(&filepath), RecursiveMode::Recursive)
-        .map_err(|e| format!("failed to watch directory: {}", e))?;
-
-    watchers.insert(filepath, (watcher, 1));
-    Ok(())
+    subscribe_directory(filepath, &state, RecursiveMode::Recursive, callback).await
 }
 
 /// ディレクトリ監視を解除する
@@ -63,15 +36,7 @@ pub(crate) async fn unsubscribe_dir_notification(
     filepath: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let mut watchers = state.watchers.lock().await;
-
-    if let Some((_, ref_count)) = watchers.get_mut(&filepath) {
-        *ref_count -= 1;
-        if *ref_count == 0 {
-            watchers.remove(&filepath);
-        }
-    }
-    Ok(())
+    unsubscribe_directory(filepath, &state).await
 }
 
 /// ディレクトリ変更通知を受けてファイルツリーを再構築する
