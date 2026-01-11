@@ -1,11 +1,14 @@
 import { defineConfig } from 'vite';
 import solidPlugin from 'vite-plugin-solid';
 import { resolve } from "path";
+import { fileURLToPath, URL } from 'node:url';
+
+const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
 export default defineConfig({
   plugins: [solidPlugin()],
 
-  // Vite optons tailored for Tauri development and only applied in `tauri dev` or `tauri build`
+  // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   // prevent vite from obscuring rust errors
   clearScreen: false,
   // tauri expects a fixed port, fail if that port is not available
@@ -14,10 +17,10 @@ export default defineConfig({
     strictPort: true,
   },
   // to make use of `TAURI_DEBUG` and other env variables
-  // https://tauri.studio/v1/api/config#buildconfig.beforedevcommand
+  // https://tauri.app/develop/configuration/#build-config
   envPrefix: ['VITE_', 'TAURI_'],
   build: {
-    // Tauri supports es2021
+    // Tauri v2 supports es2021
     target: ['es2021', 'chrome100', 'safari13'],
     // don't minify for debug builds
     minify: !process.env.TAURI_DEBUG ? 'esbuild' : false,
