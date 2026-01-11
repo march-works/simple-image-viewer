@@ -17,7 +17,7 @@ export const Folder: Component<Props> = (props) => {
   const [data] = createResource(
     () => props.thumb.thumbpath,
     () =>
-      props.thumb.thumbpath ? convertFileSrc(props.thumb.thumbpath) : fallback
+      props.thumb.thumbpath ? convertFileSrc(props.thumb.thumbpath) : fallback,
   );
   return (
     <div class="flex flex-col w-48 h-48 overflow-hidden relative">
