@@ -1,4 +1,12 @@
-import { For, Show, createEffect, createSignal, on, onCleanup } from 'solid-js';
+import {
+  For,
+  Show,
+  createEffect,
+  createSignal,
+  on,
+  onCleanup,
+  onMount,
+} from 'solid-js';
 import type { Component } from 'solid-js';
 import { Pagination } from '../../components/Pagination/Pagination';
 import { Folder } from '../../features/Folder/routes/Folder';
@@ -36,31 +44,31 @@ export const ExplorerTab: Component<Props> = (props) => {
   let unListenRef: UnlistenFn | undefined = undefined;
   let divRef!: HTMLDivElement;
 
-  // Use appWindow.listen to only receive events targeted at this window
-  appWindow
-    .listen('explorer-tab-state-changed', (event) => {
-      const {
-        key,
-        transfer_path: transferPath,
-        page,
-        end,
-        folders,
-      } = event.payload as TabState;
-      if (key !== props.tabKey) return;
-      setPagination([page, end]);
-      setTransferPath(transferPath);
-      setFolders(folders);
-      setIsLoading(false);
-    })
-    .then((unListen) => (unListenRef = unListen));
+  // onMountで非同期リスナー登録を確実に待つ
+  onMount(async () => {
+    // イベントリスナーを登録し、確実にunListenRefに保存
+    unListenRef = await appWindow.listen(
+      'explorer-tab-state-changed',
+      (event) => {
+        const {
+          key,
+          transfer_path: transferPath,
+          page,
+          end,
+          folders,
+        } = event.payload as TabState;
+        if (key !== props.tabKey) return;
+        setPagination([page, end]);
+        setTransferPath(transferPath);
+        setFolders(folders);
+        setIsLoading(false);
+      },
+    );
 
-  invoke('request_restore_explorer_tab_state', {
-    label: appWindow.label,
-    key: props.tabKey,
-  });
-
-  onCleanup(() => {
-    unListenRef && unListenRef();
+    invoke('request_restore_explorer_tab_state', {
+      label: appWindow.label,
+      key: props.tabKey,
+    });
   });
 
   createEffect(
@@ -172,10 +180,10 @@ export const ExplorerTab: Component<Props> = (props) => {
   document.addEventListener('mouseup', handleOnButtonDown, false);
 
   onCleanup(() => {
-    // unListenRef && unListenRef();
     document.removeEventListener('keydown', handleOnKeyDown, false);
     document.removeEventListener('mouseup', handleOnButtonDown, false);
-    unListenRef && unListenRef();
+    // Tauriイベントリスナーを解除
+    unListenRef?.();
   });
 
   return (

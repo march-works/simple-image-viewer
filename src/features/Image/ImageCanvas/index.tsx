@@ -29,6 +29,7 @@ export const ImageCanvas: Component<Props> = (props) => {
   const [initialPosition, setInitialPosition] = createSignal({ x: 0, y: 0 });
   const [imageScale, setImageScale] = createSignal<number>(1);
   const [position, setPosition] = createSignal({ x: 0, y: 0 });
+  let videoRef: HTMLVideoElement | undefined;
 
   const handleWheel = (e: WheelEvent) => {
     e.preventDefault();
@@ -55,6 +56,12 @@ export const ImageCanvas: Component<Props> = (props) => {
 
   onCleanup(() => {
     document.removeEventListener('keydown', handleOnKeyDown, false);
+    // 動画リソースを明示的に解放
+    if (videoRef) {
+      videoRef.pause();
+      videoRef.src = '';
+      videoRef.load();
+    }
   });
 
   const handlePositionChange = (newPosition: { x: number; y: number }) => {
@@ -120,6 +127,15 @@ export const ImageCanvas: Component<Props> = (props) => {
     ),
   );
 
+  // 動画ソース変更時に前の動画リソースを解放し、新しいソースを読み込む
+  createEffect(
+    on(data, () => {
+      if (videoRef && props.viewing?.file_type === 'Video') {
+        videoRef.load();
+      }
+    }),
+  );
+
   return (
     <div class="flex flex-row content-center" style={{ flex: 4 }}>
       <div
@@ -153,6 +169,7 @@ export const ImageCanvas: Component<Props> = (props) => {
             </Match>
             <Match when={props.viewing?.file_type === 'Video'}>
               <video
+                ref={videoRef}
                 class="video-js vjs-theme-fantasy w-full h-full object-contain"
                 controls
                 preload="auto"

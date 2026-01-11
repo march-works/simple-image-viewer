@@ -1,4 +1,6 @@
+use notify::RecommendedWatcher;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs::read_dir;
 use sysinfo::Disks;
 use tauri::State;
@@ -89,6 +91,8 @@ pub struct AppState {
     pub active: Mutex<ActiveViewer>,
     pub viewers: Mutex<Vec<ViewerState>>,
     pub explorers: Mutex<Vec<ExplorerState>>,
+    /// ディレクトリ監視のwatcher管理 (path -> (watcher, 参照カウント))
+    pub watchers: Mutex<HashMap<String, (RecommendedWatcher, usize)>>,
 }
 
 pub(crate) async fn add_viewer_state<'a>(state: &State<'a, AppState>) -> Result<String, String> {
@@ -315,8 +319,22 @@ pub(crate) async fn open_file_pick_dialog(app: &tauri::AppHandle) -> Result<Stri
     }
 }
 
+/// ディレクトリのファイルツリーを再構築する
+/// ディレクトリ変更通知を受けた際にフロントエンドから呼び出される
+pub(crate) fn rebuild_file_tree(path: &str, is_compressed: bool) -> Vec<FileTree> {
+    if is_compressed {
+        get_compressed_file_tree(&path.to_string())
+    } else {
+        let mut key_count = 0;
+        get_file_tree(&path.to_string(), &mut key_count)
+    }
+}
+
 fn get_file_tree(path: &String, key_count: &mut i32) -> Vec<FileTree> {
-    let dirs = std::fs::read_dir(path).unwrap();
+    let dirs = match std::fs::read_dir(path) {
+        Ok(d) => d,
+        Err(_) => return vec![],
+    };
     let mut files = dirs
         .map(|f| {
             let filepath = f.unwrap().path();
@@ -361,13 +379,19 @@ fn get_file_tree(path: &String, key_count: &mut i32) -> Vec<FileTree> {
     files
 }
 
+/// ZIPファイル内のファイルツリーを取得（ストリーミング読み込み）\n
 fn get_compressed_file_tree(filepath: &String) -> Vec<FileTree> {
     let mut key_count = 0;
-    let file = std::fs::read(filepath).unwrap_or_default();
-    let zip = zip::ZipArchive::new(std::io::Cursor::new(file));
-    let mut files = zip
-        .map(|f| f.file_names().map(|s| s.into()).collect::<Vec<String>>())
-        .unwrap_or_default();
+    let file = match std::fs::File::open(filepath) {
+        Ok(f) => f,
+        Err(_) => return vec![],
+    };
+    let reader = std::io::BufReader::new(file);
+    let zip = match zip::ZipArchive::new(reader) {
+        Ok(z) => z,
+        Err(_) => return vec![],
+    };
+    let mut files: Vec<String> = zip.file_names().map(|s| s.into()).collect();
     files.sort();
     files
         .iter()
