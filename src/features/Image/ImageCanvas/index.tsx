@@ -1,6 +1,5 @@
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
 import {
-  Component,
   createEffect,
   createResource,
   createSignal,
@@ -10,9 +9,10 @@ import {
   Show,
   Switch,
 } from 'solid-js';
+import type { Component } from 'solid-js';
 import { match } from 'ts-pattern';
 // FIXME
-import { File } from '../../../pages/viewer/ViewerTab';
+import type { File } from '../../../pages/viewer/ViewerTab';
 import { HiSolidChevronLeft, HiSolidChevronRight } from 'solid-icons/hi';
 import { AiOutlineZoomIn, AiOutlineZoomOut } from 'solid-icons/ai';
 import 'video.js/dist/video-js.css';
