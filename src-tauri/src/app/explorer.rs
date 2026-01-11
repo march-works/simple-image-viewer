@@ -324,6 +324,14 @@ pub(crate) async fn move_explorer_forward(
     let (thumbnails, total_pages) =
         explore_path_with_count(&path, page, state.thumbnail_cache.clone()).await?;
     if page > total_pages {
+        // 範囲外の場合は現在のページ状態をemitしてローディングを解除
+        let tab_state = {
+            let explorers = state.explorers.lock().await;
+            let explorer_state = explorers.iter().find(|w| w.label == label).unwrap();
+            explorer_state.tabs[index].clone()
+        };
+        app.emit_to(&label, "explorer-tab-state-changed", &tab_state)
+            .map_err(|_| "failed to emit explorer state".to_string())?;
         return Ok(());
     }
 
@@ -348,6 +356,14 @@ pub(crate) async fn move_explorer_backward(
     };
 
     if page == 0 {
+        // 範囲外の場合は現在のページ状態をemitしてローディングを解除
+        let tab_state = {
+            let explorers = state.explorers.lock().await;
+            let explorer_state = explorers.iter().find(|w| w.label == label).unwrap();
+            explorer_state.tabs[index].clone()
+        };
+        app.emit_to(&label, "explorer-tab-state-changed", &tab_state)
+            .map_err(|_| "failed to emit explorer state".to_string())?;
         return Ok(());
     }
 
