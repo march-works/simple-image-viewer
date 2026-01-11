@@ -116,7 +116,7 @@ pub fn create_viewer() -> Builder<Wry> {
             let quit_item = MenuItemBuilder::with_id("quit", "Quit").build(app)?;
             let menu = MenuBuilder::new(app).item(&quit_item).build()?;
             app.set_menu(menu)?;
-            
+
             // when other process already running
             if get_running_count() > 1 {
                 match app.cli().matches() {
