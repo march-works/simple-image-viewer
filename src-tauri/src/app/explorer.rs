@@ -1,15 +1,10 @@
 use fs_extra::dir::{move_dir, CopyOptions};
 use tauri::{AppHandle, Emitter, State, WebviewUrl, WebviewWindowBuilder};
 
-#[allow(unused_imports)]
-use tokio_stream::StreamExt;
-
 use crate::service::app_state::{
     add_explorer_state, add_explorer_tab_state, explore_path, get_page_count,
     remove_explorer_tab_state, reset_explorer_tab_state, ActiveTab, AppState,
 };
-
-pub struct StreamActivation(bool);
 
 #[tauri::command]
 pub(crate) async fn transfer_folder(
