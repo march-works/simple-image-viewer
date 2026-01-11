@@ -9,24 +9,24 @@ Tauri + SolidJS + TypeScript + Rust で構築されています。
 
 ### フロントエンド
 
-- **フレームワーク**: SolidJS (v1.7.3) - React に似たリアクティブ UI フレームワーク
-- **ルーティング**: @solidjs/router (v0.8.2)
-- **スタイリング**: TailwindCSS (v3.3.1)
-- **ビルドツール**: Vite (v3.2.6) + vite-plugin-solid
-- **言語**: TypeScript (v4.9.5)
+- **フレームワーク**: SolidJS (v1.9.10) - React に似たリアクティブ UI フレームワーク
+- **ルーティング**: @solidjs/router (v0.15.4)
+- **スタイリング**: TailwindCSS (v4.1.18)
+- **ビルドツール**: Vite (v7.3.1) + vite-plugin-solid
+- **言語**: TypeScript (v5.9.3)
 - **パターンマッチング**: ts-pattern (v4.2.2)
 - **動画再生**: video.js (v8.3.0)
 
 ### バックエンド (Tauri / Rust)
 
-- **Tauri**: v1.6.2 (デスクトップアプリケーションフレームワーク)
+- **Tauri**: v2.x (デスクトップアプリケーションフレームワーク)
 - **Rust Edition**: 2021
-- **gRPC**: tonic (v0.11.0) + prost (v0.12.4)
 - **非同期ランタイム**: tokio (v1.37.0)
 - **ZIP ファイル処理**: zip (v1.1.3)
 - **ファイル監視**: notify (v6.1.1)
 - **自然順ソート**: natord (v1.0.9)
-- **状態永続化**: tauri-plugin-store
+- **状態永続化**: tauri-plugin-store (v2.x)
+- **シングルインスタンス**: tauri-plugin-single-instance (v2.x)
 
 ## プロジェクト構造
 
@@ -52,17 +52,10 @@ simple-image-viewer/
 │   │   ├── app/                  # アプリケーションロジック
 │   │   │   ├── explorer.rs       # エクスプローラー機能
 │   │   │   └── viewer.rs         # ビューアー機能
-│   │   ├── grpc/                 # gRPC サーバー (プロセス間通信)
-│   │   │   ├── add_tab.rs        # タブ追加サービス
-│   │   │   ├── new_window.rs     # 新規ウィンドウサービス
-│   │   │   └── server.rs         # gRPCサーバー起動
 │   │   ├── service/              # サービス層
 │   │   │   └── app_state.rs      # アプリケーション状態管理
 │   │   └── utils/                # ユーティリティ
 │   │       └── file_utils.rs     # ファイル操作ユーティリティ
-│   └── proto/                    # Protocol Buffers定義
-│       ├── add_tab.proto
-│       └── new_window.proto
 ├── index.html                    # Viewerエントリーポイント
 ├── explorer.html                 # Explorerエントリーポイント
 └── vite.config.ts                # Vite設定 (マルチページ設定)
@@ -121,7 +114,10 @@ simple-image-viewer/
 ## 開発コマンド
 
 ```bash
-# 開発サーバー起動
+# 開発サーバー起動（開発用識別子を使用、本番版と分離）
+pnpm tauri:dev
+
+# 開発サーバー起動（本番用識別子を使用）
 pnpm tauri dev
 
 # ビルド
@@ -165,8 +161,24 @@ pnpm format-back
 
 - マルチウィンドウ対応: Viewer と Explorer は別ウィンドウで動作
 - 状態管理: アプリケーション状態は Rust 側で管理し、tauri-plugin-store で永続化
-- gRPC サーバー: ポート 50052 で起動、プロセス間通信に使用
+- シングルインスタンス: tauri-plugin-single-instance を使用、プロセス間通信に使用
 - 自動アップデート: Tauri Updater を使用、GitHub Gist 経由で配信
+
+## 開発環境と本番環境の分離
+
+開発時と本番時で環境を分離するため、以下の仕組みを導入している:
+
+| 項目 | 開発 (`pnpm tauri:dev`) | 本番 (リリースビルド) |
+|------|------------------------|----------------------|
+| App Identifier | `com.simple-image-viewer.march.dev` | `com.simple-image-viewer.march` |
+| シングルインスタンス | 開発版同士で共有 | 本番版同士で共有 |
+| Viewer タイトル | `Simple Image Viewer [DEV]` | `Simple Image Viewer` |
+| Explorer タイトル | `Image Explorer [DEV]` | `Image Explorer` |
+| 状態ファイル | `{AppData}/simple-image-viewer-dev/state.json` | `{AppData}/simple-image-viewer/state.json` |
+
+- 設定ファイル: `src-tauri/tauri.dev.conf.json` で開発用の identifier を定義
+- 実行時判定: `cfg!(debug_assertions)` でビルドモードを判定し、パス・タイトルを切り替え
+- 詳細: `docs/dev-prod-environment-separation.md` を参照
 
 ## JSX の記法
 

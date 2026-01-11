@@ -22,8 +22,9 @@ use crate::{
             change_active_viewer, change_active_viewer_tab, change_viewing,
             get_filenames_inner_zip, move_backward, move_forward, open_file_image,
             open_image_dialog, open_new_viewer, open_new_viewer_tab, read_image_in_zip,
-            remove_viewer_tab, request_restore_viewer_state, request_restore_viewer_tab_state,
-            subscribe_dir_notification,
+            refresh_viewer_tab_tree, remove_viewer_tab, request_restore_viewer_state,
+            request_restore_viewer_tab_state, subscribe_dir_notification,
+            unsubscribe_dir_notification,
         },
     },
     service::app_state::{
@@ -58,9 +59,36 @@ impl Default for SavedState {
     }
 }
 
+/// Returns the app directory name based on build mode
+fn get_app_dir_name() -> &'static str {
+    if cfg!(debug_assertions) {
+        "simple-image-viewer-dev"
+    } else {
+        "simple-image-viewer"
+    }
+}
+
+/// Returns the viewer window title based on build mode
+fn get_viewer_title() -> &'static str {
+    if cfg!(debug_assertions) {
+        "Simple Image Viewer [DEV]"
+    } else {
+        "Simple Image Viewer"
+    }
+}
+
+/// Returns the explorer window title based on build mode
+fn get_explorer_title() -> &'static str {
+    if cfg!(debug_assertions) {
+        "Image Explorer [DEV]"
+    } else {
+        "Image Explorer"
+    }
+}
+
 pub fn create_viewer() -> Builder<Wry> {
     let save_dir = dirs::data_dir().unwrap_or_default();
-    let save_path = save_dir.join("simple-image-viewer").join("state.json");
+    let save_path = save_dir.join(get_app_dir_name()).join("state.json");
     let saved_state = if let Ok(data) = std::fs::read_to_string(save_path.clone()) {
         serde_json::from_str::<SavedState>(&data).unwrap_or_default()
     } else {
@@ -71,6 +99,7 @@ pub fn create_viewer() -> Builder<Wry> {
         active: Mutex::new(saved_state.active),
         viewers: Mutex::new(saved_state.viewers.clone()),
         explorers: Mutex::new(saved_state.explorers.clone()),
+        watchers: Mutex::new(std::collections::HashMap::new()),
     };
     let viewers_to_restore = saved_state.viewers.clone();
     let explorers_to_restore = saved_state.explorers.clone();
@@ -103,7 +132,7 @@ pub fn create_viewer() -> Builder<Wry> {
                             &label,
                             WebviewUrl::App("index.html".into()),
                         )
-                        .title("Simple Image Viewer")
+                        .title(get_viewer_title())
                         .maximized(true)
                         .build();
                     }
@@ -136,7 +165,7 @@ pub fn create_viewer() -> Builder<Wry> {
                         label.clone(),
                         WebviewUrl::App("index.html".into()),
                     )
-                    .title("Simple Image Viewer")
+                    .title(get_viewer_title())
                     .maximized(true)
                     .build()
                     .unwrap();
@@ -155,7 +184,7 @@ pub fn create_viewer() -> Builder<Wry> {
                         label.clone(),
                         WebviewUrl::App("explorer.html".into()),
                     )
-                    .title("Image Explorer")
+                    .title(get_explorer_title())
                     .build()
                     .unwrap();
                 });
@@ -181,7 +210,7 @@ pub fn create_viewer() -> Builder<Wry> {
                         explorers,
                     };
                     let dir = dirs::data_dir().unwrap_or_default();
-                    let app_dir = dir.join("simple-image-viewer");
+                    let app_dir = dir.join(get_app_dir_name());
                     let _ = std::fs::create_dir_all(&app_dir);
                     let path = app_dir.join("state.json");
                     let _ = std::fs::write(
@@ -213,6 +242,7 @@ pub fn create_viewer() -> Builder<Wry> {
             get_filenames_inner_zip,
             read_image_in_zip,
             subscribe_dir_notification,
+            unsubscribe_dir_notification,
             open_new_viewer,
             open_new_viewer_tab,
             open_image_dialog,
@@ -239,5 +269,6 @@ pub fn create_viewer() -> Builder<Wry> {
             move_forward,
             move_backward,
             request_restore_viewer_tab_state,
+            refresh_viewer_tab_tree,
         ])
 }

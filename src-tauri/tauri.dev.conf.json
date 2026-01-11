@@ -1,0 +1,12 @@
+{
+  "identifier": "com.simple-image-viewer.march.dev",
+  "productName": "simple-image-viewer-dev",
+  "app": {
+    "windows": [
+      {
+        "label": "viewer-0",
+        "title": "Simple Image Viewer [DEV]"
+      }
+    ]
+  }
+}
