@@ -33,7 +33,7 @@ export const ImageCanvas: Component<Props> = (props) => {
   const handleWheel = (e: WheelEvent) => {
     e.preventDefault();
     setImageScale((prev) =>
-      Math.min(Math.max(0.1, prev + (e.deltaY > 0 ? -0.1 : 0.1)), 3)
+      Math.min(Math.max(0.1, prev + (e.deltaY > 0 ? -0.1 : 0.1)), 3),
     );
   };
 
@@ -109,15 +109,15 @@ export const ImageCanvas: Component<Props> = (props) => {
         .with('Video', () => convertToLocalPath(props.viewing!))
         // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
         .with('Zip', () => readImageInZip(props.viewing!))
-        .otherwise(() => '')
+        .otherwise(() => ''),
   );
 
   createEffect(
     on(
       () => props.viewing,
       () => resetStatus(),
-      { defer: true }
-    )
+      { defer: true },
+    ),
   );
 
   return (
