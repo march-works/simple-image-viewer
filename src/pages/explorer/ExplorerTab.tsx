@@ -1,15 +1,8 @@
-import {
-  Component,
-  For,
-  Show,
-  createEffect,
-  createSignal,
-  on,
-  onCleanup,
-} from 'solid-js';
+import { For, Show, createEffect, createSignal, on, onCleanup } from 'solid-js';
+import type { Component } from 'solid-js';
 import { Pagination } from '../../components/Pagination/Pagination';
 import { Folder } from '../../features/Folder/routes/Folder';
-import { Thumbnail } from '../../features/Folder/types/Thumbnail';
+import type { Thumbnail } from '../../features/Folder/types/Thumbnail';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { FaSolidFolderOpen } from 'solid-icons/fa';
@@ -72,7 +65,7 @@ export const ExplorerTab: Component<Props> = (props) => {
     on(folders, () => {
       if (!divRef) return;
       divRef.scrollTop = 0;
-    })
+    }),
   );
 
   const selectTransferPath = async () => {

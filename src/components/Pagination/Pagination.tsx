@@ -4,7 +4,8 @@ import {
   HiSolidChevronLeft,
   HiSolidChevronRight,
 } from 'solid-icons/hi';
-import { Component, For, Show } from 'solid-js';
+import { For, Show } from 'solid-js';
+import type { Component } from 'solid-js';
 
 type Props = {
   current?: number;

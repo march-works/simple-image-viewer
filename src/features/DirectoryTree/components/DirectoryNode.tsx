@@ -1,4 +1,5 @@
-import { Component, createMemo, createSignal, For, Show } from 'solid-js';
+import { createMemo, createSignal, For, Show } from 'solid-js';
+import type { Component } from 'solid-js';
 import { match, P } from 'ts-pattern';
 import { ImageNode } from './ImageNode';
 import { NodeBaseStyle } from './NodeBaseStyle';
@@ -10,7 +11,7 @@ import {
   FaSolidFolder,
 } from 'solid-icons/fa';
 import { VideoNode } from './VideoNode';
-import { Directory, File } from '../../../pages/viewer/ViewerTab';
+import type { Directory, File } from '../../../pages/viewer/ViewerTab';
 import equal from 'fast-deep-equal';
 
 type Props = {
