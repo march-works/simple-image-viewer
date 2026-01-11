@@ -53,7 +53,6 @@ export const ExplorerTab: Component<Props> = (props) => {
 
   invoke('request_restore_explorer_tab_state', {
     label: appWindow.label,
-    // eslint-disable-next-line solid/reactivity
     key: props.tabKey,
   });
 
