@@ -1,7 +1,8 @@
-import { Component, createEffect, onCleanup } from 'solid-js';
+import { createEffect, onCleanup } from 'solid-js';
+import type { Component } from 'solid-js';
 import { NodeBaseStyle } from './NodeBaseStyle';
 import { FaSolidImage } from 'solid-icons/fa';
-import { File } from '../../../pages/viewer/ViewerTab';
+import type { File } from '../../../pages/viewer/ViewerTab';
 
 type Props = {
   node: File;

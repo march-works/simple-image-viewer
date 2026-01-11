@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
-import { Component, createSignal, onCleanup } from 'solid-js';
+import { createSignal, onCleanup } from 'solid-js';
+import type { Component } from 'solid-js';
 import { PathSelection } from '../../features/DirectoryTree/routes/PathSelection';
 import { ImageCanvas } from '../../features/Image/ImageCanvas';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';

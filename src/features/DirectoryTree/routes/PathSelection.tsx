@@ -1,6 +1,6 @@
-import { Component } from 'solid-js';
+import type { Component } from 'solid-js';
 import { DirectoryList } from '../components/DirectoryList';
-import { FileTree, File } from '../../../pages/viewer/ViewerTab';
+import type { FileTree, File } from '../../../pages/viewer/ViewerTab';
 
 type Props = {
   tree: FileTree[];
