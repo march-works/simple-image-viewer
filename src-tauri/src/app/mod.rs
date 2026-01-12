@@ -32,9 +32,10 @@ use crate::{
             subscribe_dir_notification, unsubscribe_dir_notification,
         },
     },
-    service::app_state::{
-        add_viewer_state, add_viewer_tab_state, remove_explorer_state, remove_viewer_state,
-        ActiveViewer, AppState, ExplorerState, ViewerState,
+    service::{
+        app_state::{ActiveViewer, AppState},
+        explorer_state::{remove_explorer_state, ExplorerState},
+        viewer_state::{add_viewer_state, add_viewer_tab_state, remove_viewer_state, ViewerState},
     },
 };
 

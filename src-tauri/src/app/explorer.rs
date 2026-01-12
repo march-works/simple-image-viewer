@@ -2,9 +2,10 @@ use fs_extra::dir::{move_dir, CopyOptions};
 use notify::RecursiveMode;
 use tauri::{AppHandle, Emitter, State, WebviewUrl, WebviewWindowBuilder};
 
-use crate::service::app_state::{
+use crate::service::app_state::{ActiveTab, AppState};
+use crate::service::explorer_state::{
     add_explorer_state, add_explorer_tab_state, explore_path_with_count, remove_explorer_tab_state,
-    reset_explorer_tab_state, ActiveTab, AppState,
+    reset_explorer_tab_state,
 };
 use crate::utils::watcher_utils::{
     create_explorer_watcher_callback, subscribe_directory, unsubscribe_directory,

@@ -2,6 +2,7 @@ use tauri::{AppHandle, Emitter, State};
 
 use crate::app::explorer_types::SortConfig;
 use crate::service::app_state::AppState;
+use crate::service::explorer_state::Thumbnail;
 
 /// タブ状態から (path, page, sort, search_query) を取得するタプル
 pub type TabStateQuery = (String, usize, SortConfig, Option<String>);
@@ -91,7 +92,7 @@ pub(crate) async fn update_tab_and_emit(
     label: &str,
     index: usize,
     page: usize,
-    thumbnails: Vec<crate::service::app_state::Thumbnail>,
+    thumbnails: Vec<Thumbnail>,
     total_pages: usize,
     state: &State<'_, AppState>,
     app: &AppHandle,

@@ -71,8 +71,11 @@ pub fn create_explorer_watcher_callback(
             let cache_clone = cache.clone();
             let path_clone = path.clone();
             tokio::spawn(async move {
-                crate::service::app_state::clear_thumbnail_cache_for_dir(&path_clone, cache_clone)
-                    .await;
+                crate::service::explorer_state::clear_thumbnail_cache_for_dir(
+                    &path_clone,
+                    cache_clone,
+                )
+                .await;
             });
 
             // フロントエンドに通知
