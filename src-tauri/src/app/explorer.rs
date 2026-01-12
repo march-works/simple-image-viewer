@@ -590,21 +590,11 @@ pub(crate) async fn rebuild_recommendations(
                         .await
                         .map_err(|e| e.to_string())?;
 
-                    // パス埋め込みを生成（フォルダ名を使用）
-                    let folder_name = std::path::Path::new(&record.path)
-                        .file_name()
-                        .and_then(|n| n.to_str())
-                        .unwrap_or(&record.path);
-                    let path_embedding = service
-                        .generate_text_embedding(folder_name)
-                        .await
-                        .map_err(|e| e.to_string())?;
-
-                    // DB に保存
+                    // DB に保存 (path_embedding は空のベクトル - 将来の実装のために列は残す)
                     db.update_embeddings(
                         &record.path,
                         &embedding_to_bytes(&image_embedding),
-                        &embedding_to_bytes(&path_embedding),
+                        &[], // path_embedding は現在未使用
                         EMBEDDING_VERSION,
                     )
                     .map_err(|e| e.to_string())?;
