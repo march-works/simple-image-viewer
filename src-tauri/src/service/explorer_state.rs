@@ -8,7 +8,7 @@ use sysinfo::Disks;
 use tauri::State;
 use tokio::sync::RwLock;
 
-use super::app_state::{ActiveTab, AppState};
+use super::types::{ActiveTab, AppState};
 use crate::app::explorer_types::{SortConfig, SortField, SortOrder};
 
 // ========================================

@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
-use super::app_state::{ActiveTab, AppState};
+use super::types::{ActiveTab, AppState};
 use crate::utils::file_utils::{
     get_filename_without_extension, get_parent_dir, get_parent_dir_name, is_compressed_file,
     is_executable_file, is_image_file, is_video_file,
