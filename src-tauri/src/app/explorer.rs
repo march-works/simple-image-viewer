@@ -36,6 +36,7 @@ pub(crate) async fn transfer_folder(
         state.thumbnail_cache.clone(),
         &sort,
         search_query.as_deref(),
+        Some(&state.db),
     )
     .await?;
     if page > total_pages {
@@ -173,6 +174,7 @@ pub(crate) async fn change_explorer_path(
         state.thumbnail_cache.clone(),
         &sort,
         search_query.as_deref(),
+        Some(&state.db),
     )
     .await?;
 
@@ -286,6 +288,7 @@ pub(crate) async fn change_explorer_page(
         state.thumbnail_cache.clone(),
         &sort,
         search_query.as_deref(),
+        Some(&state.db),
     )
     .await?;
     let tab_state = update_tab_state(&label, index, page, thumbnails, total_pages, &state).await?;
@@ -321,6 +324,7 @@ pub(crate) async fn move_explorer_forward(
         state.thumbnail_cache.clone(),
         &sort,
         search_query.as_deref(),
+        Some(&state.db),
     )
     .await?;
     if page > total_pages {
@@ -354,6 +358,7 @@ pub(crate) async fn move_explorer_backward(
         state.thumbnail_cache.clone(),
         &sort,
         search_query.as_deref(),
+        Some(&state.db),
     )
     .await?;
     update_tab_and_emit(&label, index, page, thumbnails, total_pages, &state, &app).await?;
@@ -375,6 +380,7 @@ pub(crate) async fn move_explorer_to_end(
         state.thumbnail_cache.clone(),
         &sort,
         search_query.as_deref(),
+        Some(&state.db),
     )
     .await?;
     let page = total_pages;
@@ -384,6 +390,7 @@ pub(crate) async fn move_explorer_to_end(
         state.thumbnail_cache.clone(),
         &sort,
         search_query.as_deref(),
+        Some(&state.db),
     )
     .await?;
 
@@ -407,6 +414,7 @@ pub(crate) async fn move_explorer_to_start(
         state.thumbnail_cache.clone(),
         &sort,
         search_query.as_deref(),
+        Some(&state.db),
     )
     .await?;
     update_tab_and_emit(&label, index, page, thumbnails, total_pages, &state, &app).await?;
@@ -455,6 +463,7 @@ pub(crate) async fn refresh_explorer_tab(
         state.thumbnail_cache.clone(),
         &sort,
         search_query.as_deref(),
+        Some(&state.db),
     )
     .await?;
     update_tab_and_emit(&label, index, page, thumbnails, total_pages, &state, &app).await?;
@@ -492,6 +501,7 @@ pub(crate) async fn change_explorer_sort(
             state.thumbnail_cache.clone(),
             &sort,
             search_query.as_deref(),
+            Some(&state.db),
         )
         .await?;
         update_tab_and_emit(&label, index, 1, thumbnails, total_pages, &state, &app).await?;
@@ -533,6 +543,7 @@ pub(crate) async fn change_explorer_search(
             state.thumbnail_cache.clone(),
             &sort,
             query.as_deref(),
+            Some(&state.db),
         )
         .await?;
         update_tab_and_emit(&label, index, 1, thumbnails, total_pages, &state, &app).await?;
@@ -544,12 +555,20 @@ pub(crate) async fn change_explorer_search(
 }
 
 /// リコメンドを再構築する（バックグラウンド処理）
+/// 指定ディレクトリ配下のすべてのフォルダのサムネイルから埋め込みを生成する
+/// force_rebuild=false の場合、フォルダの更新日時が変わっていないものはスキップする
 #[tauri::command]
 pub(crate) async fn rebuild_recommendations(
+    directory_path: String,
+    force_rebuild: Option<bool>,
     state: State<'_, AppState>,
     app: AppHandle,
 ) -> Result<(), String> {
     use crate::service::embedding_service::{embedding_to_bytes, EMBEDDING_VERSION};
+    use std::fs::read_dir;
+    use std::time::UNIX_EPOCH;
+
+    let force = force_rebuild.unwrap_or(false);
 
     let embedding_service = state
         .embedding_service
@@ -560,6 +579,36 @@ pub(crate) async fn rebuild_recommendations(
     if embedding_service.is_processing().await {
         return Err("Recommendation rebuild already in progress".to_string());
     }
+
+    // ディレクトリ配下のフォルダ一覧を取得（更新日時付き）
+    let dirs = read_dir(&directory_path).map_err(|_| "failed to open directory")?;
+    let folder_entries: Vec<(String, i64)> = dirs
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().is_dir())
+        .filter_map(|e| {
+            let path = e.path().to_str()?.to_string();
+            let modified = e
+                .metadata()
+                .ok()?
+                .modified()
+                .ok()?
+                .duration_since(UNIX_EPOCH)
+                .ok()?
+                .as_secs() as i64;
+            Some((path, modified))
+        })
+        .collect();
+
+    if folder_entries.is_empty() {
+        return Err("No folders found in directory".to_string());
+    }
+
+    // 差分チェック用にDB内の folder_modified_at を一括取得
+    let folder_paths: Vec<String> = folder_entries.iter().map(|(p, _)| p.clone()).collect();
+    let db_modified_map = state
+        .db
+        .get_folder_modified_at_batch(&folder_paths)
+        .map_err(|e| e.to_string())?;
 
     // 処理開始
     embedding_service.set_processing(true).await;
@@ -574,47 +623,99 @@ pub(crate) async fn rebuild_recommendations(
 
     tokio::spawn(async move {
         let result = async {
-            // 埋め込みが必要なレコードを取得
-            let records = db
-                .get_records_needing_embedding(EMBEDDING_VERSION)
-                .map_err(|e| e.to_string())?;
+            let total = folder_entries.len();
+            eprintln!(
+                "[rebuild_recommendations] Processing {} folders in {} (force={})",
+                total, directory_path, force
+            );
 
-            let total = records.len();
             let mut processed = 0;
+            let mut skipped_unchanged = 0;
+            let mut skipped_error = 0;
 
-            for record in records {
-                if let Some(thumbnail_blob) = &record.thumbnail_blob {
-                    // 画像埋め込みを生成
-                    let image_embedding = service
-                        .generate_image_embedding(thumbnail_blob)
-                        .await
-                        .map_err(|e| e.to_string())?;
-
-                    // DB に保存 (path_embedding は空のベクトル - 将来の実装のために列は残す)
-                    db.update_embeddings(
-                        &record.path,
-                        &embedding_to_bytes(&image_embedding),
-                        &[], // path_embedding は現在未使用
-                        EMBEDDING_VERSION,
-                    )
-                    .map_err(|e| e.to_string())?;
-
-                    processed += 1;
-
-                    // 進捗を通知（10件ごと）
-                    if processed % 10 == 0 {
-                        let _ = app_handle.emit(
-                            "rebuild-recommendations-progress",
-                            serde_json::json!({
-                                "processed": processed,
-                                "total": total
-                            }),
-                        );
+            for (folder_path, folder_modified) in folder_entries {
+                // 差分チェック: DBに保存された更新日時と比較
+                if !force {
+                    if let Some(&db_modified) = db_modified_map.get(&folder_path) {
+                        if db_modified >= folder_modified {
+                            skipped_unchanged += 1;
+                            continue;
+                        }
                     }
+                }
+
+                // フォルダの最初の画像を取得
+                let thumbnail_path = find_first_image_in_folder(std::path::Path::new(&folder_path));
+
+                if thumbnail_path.is_empty() {
+                    skipped_error += 1;
+                    continue;
+                }
+
+                // 画像を読み込み
+                let thumbnail_data = match tokio::fs::read(&thumbnail_path).await {
+                    Ok(data) => data,
+                    Err(e) => {
+                        eprintln!(
+                            "[rebuild_recommendations] Failed to read {}: {}",
+                            thumbnail_path, e
+                        );
+                        skipped_error += 1;
+                        continue;
+                    }
+                };
+
+                // 画像埋め込みを生成
+                let image_embedding = match service.generate_image_embedding(&thumbnail_data).await
+                {
+                    Ok(emb) => emb,
+                    Err(e) => {
+                        eprintln!(
+                            "[rebuild_recommendations] Failed to generate embedding for {}: {}",
+                            folder_path, e
+                        );
+                        skipped_error += 1;
+                        continue;
+                    }
+                };
+
+                // DB に保存（サムネイルとフォルダ更新日時も一緒に保存）
+                if let Err(e) = db.upsert_folder_embedding(
+                    &folder_path,
+                    Some(&thumbnail_data),
+                    &embedding_to_bytes(&image_embedding),
+                    EMBEDDING_VERSION,
+                    folder_modified,
+                ) {
+                    eprintln!(
+                        "[rebuild_recommendations] Failed to save embedding for {}: {}",
+                        folder_path, e
+                    );
+                    skipped_error += 1;
+                    continue;
+                }
+
+                processed += 1;
+
+                // 進捗を通知（10件ごと）
+                if processed % 10 == 0 || (processed + skipped_unchanged) % 100 == 0 {
+                    let _ = app_handle.emit(
+                        "rebuild-recommendations-progress",
+                        serde_json::json!({
+                            "processed": processed,
+                            "total": total,
+                            "skipped_unchanged": skipped_unchanged,
+                            "skipped_error": skipped_error
+                        }),
+                    );
                 }
             }
 
-            Ok::<_, String>(processed)
+            eprintln!(
+                "[rebuild_recommendations] Completed: {} processed, {} unchanged, {} errors",
+                processed, skipped_unchanged, skipped_error
+            );
+            Ok::<_, String>((processed, skipped_unchanged, skipped_error))
         }
         .await;
 
@@ -622,10 +723,14 @@ pub(crate) async fn rebuild_recommendations(
         service.set_processing(false).await;
 
         match result {
-            Ok(count) => {
+            Ok((count, skipped_unchanged, skipped_error)) => {
                 let _ = app_handle.emit(
                     "rebuild-recommendations-completed",
-                    serde_json::json!({ "processed": count }),
+                    serde_json::json!({
+                        "processed": count,
+                        "skipped_unchanged": skipped_unchanged,
+                        "skipped_error": skipped_error
+                    }),
                 );
             }
             Err(e) => {
@@ -635,6 +740,30 @@ pub(crate) async fn rebuild_recommendations(
     });
 
     Ok(())
+}
+
+/// フォルダの最初の画像ファイルを見つける
+fn find_first_image_in_folder(folder_path: &std::path::Path) -> String {
+    use std::fs::read_dir;
+
+    let extensions = [
+        "jpg", "jpeg", "JPG", "JPEG", "jpe", "jfif", "pjpeg", "pjp", "png", "PNG", "gif", "tif",
+        "tiff", "bmp", "dib", "webp",
+    ];
+
+    if let Ok(inner_file) = read_dir(folder_path) {
+        for entry in inner_file.flatten() {
+            let path = entry.path();
+            let ext = path
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or_default();
+            if extensions.contains(&ext) {
+                return path.to_str().unwrap_or_default().to_string();
+            }
+        }
+    }
+    String::new()
 }
 
 /// リコメンド再構築が処理中かどうかを取得

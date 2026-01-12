@@ -20,6 +20,7 @@ const [isRebuildingRecommendations, setIsRebuildingRecommendations] =
 
 export const useExplorerTab = (tabKey: string, isActiveTab: () => boolean) => {
   const [transferPath, setTransferPath] = createSignal<string>();
+  const [currentPath, setCurrentPath] = createSignal<string>();
   const [folders, setFolders] = createSignal<Thumbnail[]>([]);
   const [pagination, setPagination] = createSignal<[number, number]>([1, 1]);
   const [isLoading, setIsLoading] = createSignal<boolean>(false);
@@ -63,6 +64,7 @@ export const useExplorerTab = (tabKey: string, isActiveTab: () => boolean) => {
       (event) => {
         const {
           key,
+          path: pathValue,
           transfer_path: transferPathValue,
           page,
           end,
@@ -72,6 +74,7 @@ export const useExplorerTab = (tabKey: string, isActiveTab: () => boolean) => {
         } = event.payload as TabState;
         if (key !== tabKey) return;
         setPagination([page, end]);
+        setCurrentPath(pathValue);
         setTransferPath(transferPathValue);
         setFolders(foldersValue);
         if (sort) {
@@ -222,8 +225,13 @@ export const useExplorerTab = (tabKey: string, isActiveTab: () => boolean) => {
   // リコメンド再構築
   const rebuildRecommendations = async () => {
     if (isRebuildingRecommendations()) return;
+    const path = currentPath();
+    if (!path) {
+      console.warn('Cannot rebuild recommendations: no directory path');
+      return;
+    }
     try {
-      await invoke('rebuild_recommendations');
+      await invoke('rebuild_recommendations', { directoryPath: path });
     } catch (error) {
       console.error('Failed to rebuild recommendations:', error);
     }

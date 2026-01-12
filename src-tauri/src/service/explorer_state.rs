@@ -8,6 +8,10 @@ use sysinfo::Disks;
 use tauri::State;
 use tokio::sync::RwLock;
 
+use crate::service::database::Database;
+use crate::service::embedding_service::{
+    average_embeddings, cosine_similarity, embedding_from_bytes,
+};
 use crate::service::explorer_types::{SortConfig, SortField, SortOrder};
 
 use super::types::{ActiveTab, AppState};
@@ -316,6 +320,112 @@ fn find_first_image_in_folder(folder_path: &std::path::Path) -> String {
     String::new()
 }
 
+/// リコメンドスコアを計算
+fn calculate_recommendation_scores(db: &Database, folder_paths: &[String]) -> HashMap<String, f64> {
+    const IMAGE_WEIGHT: f64 = 0.8;
+    const PATH_WEIGHT: f64 = 0.2;
+    const RECENT_LIMIT: usize = 20;
+
+    let mut scores = HashMap::new();
+
+    // 直近閲覧したフォルダの埋め込みを取得
+    let recent_records = match db.get_recent_viewed_records_with_embeddings(RECENT_LIMIT) {
+        Ok(records) => records,
+        Err(e) => {
+            eprintln!("[recommend] Error getting recent records: {}", e);
+            // エラー時は全てスコア0
+            for path in folder_paths {
+                scores.insert(path.clone(), 0.0);
+            }
+            return scores;
+        }
+    };
+
+    eprintln!(
+        "[recommend] Found {} recent records with embeddings",
+        recent_records.len()
+    );
+
+    if recent_records.is_empty() {
+        // 履歴がない場合は全てスコア0
+        eprintln!("[recommend] No recent records with embeddings, returning all 0 scores");
+        for path in folder_paths {
+            scores.insert(path.clone(), 0.0);
+        }
+        return scores;
+    }
+
+    // 履歴の埋め込みを平均
+    let recent_image_embeddings: Vec<Vec<f32>> = recent_records
+        .iter()
+        .filter_map(|r| r.image_embedding.as_ref().map(|e| embedding_from_bytes(e)))
+        .collect();
+    let recent_path_embeddings: Vec<Vec<f32>> = recent_records
+        .iter()
+        .filter_map(|r| r.path_embedding.as_ref().map(|e| embedding_from_bytes(e)))
+        .collect();
+
+    eprintln!(
+        "[recommend] Image embeddings: {}, Path embeddings: {}",
+        recent_image_embeddings.len(),
+        recent_path_embeddings.len()
+    );
+
+    let avg_image_embedding = average_embeddings(&recent_image_embeddings);
+    let avg_path_embedding = average_embeddings(&recent_path_embeddings);
+
+    // 対象フォルダのレコードを取得
+    let target_records = match db.get_folder_records_by_paths(folder_paths) {
+        Ok(records) => records,
+        Err(e) => {
+            eprintln!("[recommend] Error getting target records: {}", e);
+            for path in folder_paths {
+                scores.insert(path.clone(), 0.0);
+            }
+            return scores;
+        }
+    };
+
+    eprintln!(
+        "[recommend] Found {} target records in DB out of {} folders",
+        target_records.len(),
+        folder_paths.len()
+    );
+
+    // スコアを計算
+    let mut scored_count = 0;
+    for record in target_records {
+        let mut score = 0.0f64;
+
+        if let Some(image_emb) = &record.image_embedding {
+            let emb = embedding_from_bytes(image_emb);
+            let sim = cosine_similarity(&emb, &avg_image_embedding);
+            score += IMAGE_WEIGHT * sim as f64;
+            scored_count += 1;
+        }
+
+        if let Some(path_emb) = &record.path_embedding {
+            let emb = embedding_from_bytes(path_emb);
+            let sim = cosine_similarity(&emb, &avg_path_embedding);
+            score += PATH_WEIGHT * sim as f64;
+        }
+
+        scores.insert(record.path.clone(), score);
+    }
+
+    eprintln!(
+        "[recommend] Calculated scores for {} folders with embeddings",
+        scored_count
+    );
+
+    // 埋め込みがないフォルダはスコア0
+    for path in folder_paths {
+        scores.entry(path.clone()).or_insert(0.0);
+    }
+
+    scores
+}
+
 /// ディレクトリスキャン、ソート、ページネーション、サムネイル抽出を統合した最適化版
 pub(crate) async fn explore_path_with_count(
     filepath: &str,
@@ -323,6 +433,7 @@ pub(crate) async fn explore_path_with_count(
     cache: Arc<RwLock<HashMap<String, String>>>,
     sort: &SortConfig,
     search_query: Option<&str>,
+    db: Option<&Database>,
 ) -> Result<(Vec<Thumbnail>, usize), String> {
     use std::time::UNIX_EPOCH;
 
@@ -385,10 +496,32 @@ pub(crate) async fn explore_path_with_count(
         (SortField::DateCreated, SortOrder::Desc) => {
             entries_with_meta.sort_by(|a, b| b.2.cmp(&a.2));
         }
-        // リコメンドソートはフロントエンドで処理するため、
-        // ここではデフォルトの更新日時降順でソート
+        // リコメンドソート: DBから埋め込みスコアを計算してソート
         (SortField::Recommendation, _) => {
-            entries_with_meta.sort_by(|a, b| b.1.cmp(&a.1));
+            if let Some(db) = db {
+                // フォルダパスのリストを取得
+                let folder_paths: Vec<String> = entries_with_meta
+                    .iter()
+                    .map(|(e, _, _)| e.path().to_str().unwrap_or_default().to_string())
+                    .collect();
+
+                // スコアを計算
+                let scores = calculate_recommendation_scores(db, &folder_paths);
+
+                // スコアでソート（降順）
+                entries_with_meta.sort_by(|a, b| {
+                    let path_a = a.0.path().to_str().unwrap_or_default().to_string();
+                    let path_b = b.0.path().to_str().unwrap_or_default().to_string();
+                    let score_a = scores.get(&path_a).unwrap_or(&0.0);
+                    let score_b = scores.get(&path_b).unwrap_or(&0.0);
+                    score_b
+                        .partial_cmp(score_a)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                });
+            } else {
+                // DBがない場合は更新日時降順でフォールバック
+                entries_with_meta.sort_by(|a, b| b.1.cmp(&a.1));
+            }
         }
     }
 
