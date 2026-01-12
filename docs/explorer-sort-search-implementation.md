@@ -9,9 +9,9 @@ Explorer に日付ソート（昇順/降順）と名前検索機能を追加す�
 | フェーズ | 機能 | 概要 | 状態 |
 |----------|------|------|------|
 | **Phase 1** | 日付ソート・名前検索 | ソート・検索 UI | ✅ 完了 |
-| **Phase 2** | SQLite + サムネイルデータ蓄積 | リコメンドの基盤データ収集 | 📋 計画 |
+| **Phase 2** | SQLite + サムネイルデータ蓄積 | リコメンドの基盤データ収集 | ✅ 完了 |
 | **Phase 3** | ~~ルールベースリコメンド~~ | ~~頻度・傾向に基づくスコアリング~~ | ❌ 廃止 |
-| **Phase 4** | 機械学習リコメンド (CLIP) | サムネイル埋め込み + 類似度計算 | 📋 計画 |
+| **Phase 4** | 機械学習リコメンド (CLIP) | サムネイル埋め込み + 類似度計算 | 🚧 実装中 |
 
 ---
 
@@ -412,27 +412,27 @@ pub fn calculate_recommendation_scores(
 
 ---
 
-## 実装ステップ（Phase 2）
+## 実装ステップ（Phase 2）✅ 完了
 
-1. `rusqlite`, `image`, `sha2` クレートを Cargo.toml に追加
-2. `src-tauri/src/service/database.rs` 作成、DB 初期化・マイグレーション
-3. `src-tauri/src/utils/thumbnail_utils.rs` 作成、サムネイル生成関数
-4. `AppState` に DB 接続を追加、アプリ起動時に初期化
-5. `record_folder_view` コマンド追加、Viewer から呼び出し
-6. 動作確認
+1. ✅ `rusqlite`, `image`, `sha2` クレートを Cargo.toml に追加
+2. ✅ `src-tauri/src/service/database.rs` 作成、DB 初期化・マイグレーション
+3. ✅ `src-tauri/src/utils/thumbnail_utils.rs` 作成、サムネイル生成関数
+4. ✅ `AppState` に DB 接続を追加、アプリ起動時に初期化
+5. ✅ `record_folder_view` コマンド追加、Viewer から呼び出し
+6. ✅ 動作確認
 
 ---
 
-## 実装ステップ（Phase 4）
+## 実装ステップ（Phase 4）🚧 実装中
 
-1. `ort`, `ndarray` クレートを Cargo.toml に追加
-2. CLIP ONNX モデルを `src-tauri/resources/` に配置
-3. `tauri.conf.json` の `resources` にモデルファイルを追加
-4. `src-tauri/src/service/embedding_service.rs` 作成
-5. `folder_records` テーブルに埋め込みカラム追加（マイグレーション）
-6. バックグラウンド埋め込み生成処理
-7. `rebuild_recommendations` コマンド追加
-8. リコメンドスコア計算ロジック
-9. Explorer に「おすすめ順」ソートオプション追加
-10. 「リコメンドを再構築」ボタン UI
-11. 動作確認・調整
+1. ✅ `ort` クレートを Cargo.toml に追加
+2. ✅ CLIP ONNX モデルを `src-tauri/resources/` に配置
+3. ✅ `tauri.conf.json` の `resources` にモデルファイルを追加
+4. ✅ `src-tauri/src/service/embedding_service.rs` 作成
+5. ✅ `folder_records` テーブルに埋め込みカラム追加（マイグレーション）
+6. ✅ バックグラウンド埋め込み生成処理
+7. ✅ `rebuild_recommendations` コマンド追加
+8. ✅ リコメンドスコア計算ロジック
+9. ✅ Explorer に「おすすめ順」ソートオプション追加
+10. ✅ 「リコメンドを再構築」ボタン UI
+11. ⏳ 動作確認・調整

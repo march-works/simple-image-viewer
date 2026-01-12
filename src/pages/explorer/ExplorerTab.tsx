@@ -23,6 +23,7 @@ export const ExplorerTab: Component<Props> = (props) => {
     activeViewerDir,
     sortConfig,
     searchInput,
+    isRebuildingRecommendations,
     selectTransferPath,
     onFolderClick,
     transferFolder,
@@ -35,6 +36,7 @@ export const ExplorerTab: Component<Props> = (props) => {
     moveLast,
     handleSortChange,
     handleSearchInput,
+    rebuildRecommendations,
   } = useExplorerTab(props.tabKey, () => props.isActiveTab);
 
   const handleMarkedAsRead = (path: string) => {
@@ -50,10 +52,12 @@ export const ExplorerTab: Component<Props> = (props) => {
         transferPath={transferPath()}
         sortConfig={sortConfig()}
         searchInput={searchInput()}
+        isRebuildingRecommendations={isRebuildingRecommendations()}
         onResetTab={resetTab}
         onSelectTransferPath={selectTransferPath}
         onSearchInput={handleSearchInput}
         onSortChange={handleSortChange}
+        onRebuildRecommendations={rebuildRecommendations}
       />
       <FolderGrid
         folders={folders()}

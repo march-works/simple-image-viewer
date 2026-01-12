@@ -42,6 +42,12 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 image = "0.25"
 sha2 = "0.10"
 
+# Phase 4: CLIP 埋め込みベース ML リコメンド
+# tract-onnx: Pure Rust ONNX ランタイム (外部DLL不要)
+tract-onnx = "0.21"
+ndarray = "0.16"
+num_cpus = "1.16"
+
 [features]
 # by default Tauri runs in production mode
 # when `tauri dev` runs it is executed with `cargo run --no-default-features` if `devPath` is an URL

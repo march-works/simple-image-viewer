@@ -1,4 +1,8 @@
-export type SortField = 'Name' | 'DateModified' | 'DateCreated';
+export type SortField =
+  | 'Name'
+  | 'DateModified'
+  | 'DateCreated'
+  | 'Recommendation';
 export type SortOrder = 'Asc' | 'Desc';
 
 export type SortConfig = {
@@ -23,6 +27,7 @@ export const sortOptions: SortOption[] = [
   { label: '更新日 ↓', config: { field: 'DateModified', order: 'Desc' } },
   { label: '作成日 ↑', config: { field: 'DateCreated', order: 'Asc' } },
   { label: '作成日 ↓', config: { field: 'DateCreated', order: 'Desc' } },
+  { label: 'おすすめ', config: { field: 'Recommendation', order: 'Desc' } },
 ];
 
 export const getSortOptionIndex = (config: SortConfig): number => {

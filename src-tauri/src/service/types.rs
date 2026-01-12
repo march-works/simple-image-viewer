@@ -7,6 +7,7 @@ use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
 
 use super::database::Database;
+use super::embedding_service::EmbeddingService;
 use super::explorer_state::ExplorerState;
 use super::viewer_state::ViewerState;
 
@@ -39,4 +40,6 @@ pub struct AppState {
     pub thumbnail_cache: Arc<RwLock<HashMap<String, String>>>,
     /// SQLite データベース (Phase 2: リコメンド基盤)
     pub db: Arc<Database>,
+    /// CLIP 埋め込みサービス (Phase 4: ML リコメンド)
+    pub embedding_service: Option<Arc<EmbeddingService>>,
 }
