@@ -48,6 +48,10 @@ tract-onnx = "0.21"
 ndarray = "0.16"
 num_cpus = "1.16"
 
+# モデル遅延ダウンロード
+reqwest = { version = "0.12", features = ["stream"] }
+futures-util = "0.3"
+
 [features]
 # by default Tauri runs in production mode
 # when `tauri dev` runs it is executed with `cargo run --no-default-features` if `devPath` is an URL

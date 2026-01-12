@@ -3,6 +3,7 @@ pub mod database;
 pub mod embedding_service;
 pub mod explorer_state;
 pub mod explorer_types;
+pub mod model_downloader;
 pub mod types;
 pub mod viewer_state;
 

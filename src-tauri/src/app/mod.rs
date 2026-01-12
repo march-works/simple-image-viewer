@@ -36,6 +36,7 @@ use crate::{
         database::Database,
         embedding_service::EmbeddingService,
         explorer_state::{remove_explorer_state, ExplorerState},
+        model_downloader,
         viewer_state::{add_viewer_state, add_viewer_tab_state, remove_viewer_state, ViewerState},
     },
 };
@@ -172,91 +173,19 @@ pub fn create_viewer() -> Builder<Wry> {
             app.set_menu(menu)?;
 
             // Initialize CLIP embedding service (Phase 4)
-            // AppHandle からリソースパスを取得して初期化
+            // モデルは遅延ダウンロード方式で取得
             let app_handle = app.app_handle().clone();
             tokio::spawn(async move {
-                let resource_dir = app_handle
-                    .path()
-                    .resource_dir()
-                    .ok()
-                    .map(|p| p.join("resources"));
-
+                // 開発モード: src-tauri/resources から直接ロード
                 let dev_resource_dir =
                     std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources");
 
-                // 本番ビルド: バンドルされたリソースを使用
-                // 開発ビルド: src-tauri/resources を使用
-                let embedding_service = if let Some(ref res_dir) = resource_dir {
-                    let vision_path = res_dir.join("vision_model.onnx");
-                    let text_path = res_dir.join("text_model.onnx");
-                    eprintln!(
-                        "[embedding] Checking bundled resources: {:?} (exists: {}, {})",
-                        res_dir,
-                        vision_path.exists(),
-                        text_path.exists()
-                    );
-                    if vision_path.exists() && text_path.exists() {
-                        // ファイルサイズをチェック（1KB以下はLFSポインタの可能性）
-                        let vision_size = std::fs::metadata(&vision_path)
-                            .map(|m| m.len())
-                            .unwrap_or(0);
-                        let text_size = std::fs::metadata(&text_path).map(|m| m.len()).unwrap_or(0);
-                        eprintln!(
-                            "[embedding] File sizes: vision={}B, text={}B",
-                            vision_size, text_size
-                        );
-                        if vision_size > 1024 * 1024 && text_size > 1024 * 1024 {
-                            match EmbeddingService::init(res_dir) {
-                                Ok(service) => {
-                                    eprintln!(
-                                        "[embedding] CLIP embedding service initialized (bundled)"
-                                    );
-                                    Some(std::sync::Arc::new(service))
-                                }
-                                Err(e) => {
-                                    eprintln!(
-                                        "[embedding] Failed to initialize embedding service: {}",
-                                        e
-                                    );
-                                    None
-                                }
-                            }
-                        } else {
-                            eprintln!("[embedding] ONNX files too small, may be LFS pointers");
-                            None
-                        }
-                    } else if dev_resource_dir.join("vision_model.onnx").exists()
-                        && dev_resource_dir.join("text_model.onnx").exists()
-                    {
-                        // フォールバック: 開発用リソース
-                        eprintln!("[embedding] Using dev resources: {:?}", dev_resource_dir);
-                        match EmbeddingService::init(&dev_resource_dir) {
-                            Ok(service) => {
-                                eprintln!(
-                                    "[embedding] CLIP embedding service initialized (dev mode)"
-                                );
-                                Some(std::sync::Arc::new(service))
-                            }
-                            Err(e) => {
-                                eprintln!(
-                                    "[embedding] Failed to initialize embedding service: {}",
-                                    e
-                                );
-                                None
-                            }
-                        }
-                    } else {
-                        eprintln!(
-                            "[embedding] CLIP models not found, recommendation feature disabled"
-                        );
-                        None
-                    }
-                } else if dev_resource_dir.join("vision_model.onnx").exists() {
-                    // resource_dir が取得できない場合は開発モードとみなす
-                    eprintln!(
-                        "[embedding] Using dev resources (no resource_dir): {:?}",
-                        dev_resource_dir
-                    );
+                let embedding_service = if cfg!(debug_assertions)
+                    && dev_resource_dir.join("vision_model.onnx").exists()
+                    && dev_resource_dir.join("text_model.onnx").exists()
+                {
+                    // 開発モード: ローカルリソースを使用
+                    eprintln!("[embedding] Using dev resources: {:?}", dev_resource_dir);
                     match EmbeddingService::init(&dev_resource_dir) {
                         Ok(service) => {
                             eprintln!("[embedding] CLIP embedding service initialized (dev mode)");
@@ -268,8 +197,40 @@ pub fn create_viewer() -> Builder<Wry> {
                         }
                     }
                 } else {
-                    eprintln!("[embedding] CLIP models not found, recommendation feature disabled");
-                    None
+                    // 本番モード: モデルを遅延ダウンロード
+                    eprintln!("[embedding] Starting model download/cache check...");
+                    match model_downloader::ensure_models(&app_handle).await {
+                        Ok((vision_path, text_path)) => {
+                            eprintln!(
+                                "[embedding] Models ready: {:?}, {:?}",
+                                vision_path, text_path
+                            );
+                            // モデルのディレクトリを取得
+                            let models_dir = vision_path.parent().unwrap().to_path_buf();
+                            match EmbeddingService::init(&models_dir) {
+                                Ok(service) => {
+                                    eprintln!(
+                                        "[embedding] CLIP embedding service initialized (downloaded)"
+                                    );
+                                    Some(std::sync::Arc::new(service))
+                                }
+                                Err(e) => {
+                                    eprintln!(
+                                        "[embedding] Failed to initialize embedding service: {}",
+                                        e
+                                    );
+                                    None
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            eprintln!("[embedding] Failed to download models: {}", e);
+                            eprintln!(
+                                "[embedding] Recommendation feature will be disabled until models are available"
+                            );
+                            None
+                        }
+                    }
                 };
 
                 // AppHandle から state を取得して embedding_service を設定
