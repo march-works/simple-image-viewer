@@ -1,54 +1,57 @@
-import { Component, For } from 'solid-js';
-import { match } from 'ts-pattern';
-import { DirectoryTree } from '../types/DirectoryTree';
+import { For, createMemo } from 'solid-js';
+import type { Component } from 'solid-js';
+import { P, match } from 'ts-pattern';
 import { DirectoryNode } from './DirectoryNode';
 import { ImageNode } from './ImageNode';
 import { VideoNode } from './VideoNode';
 import { ZipNode } from './ZipNode';
+import type { FileTree, File } from '../../../pages/viewer/ViewerTab';
+import equal from 'fast-deep-equal';
 
 type Props = {
-  selected?: DirectoryTree;
-  tree: DirectoryTree[];
-  onClick: (path: string) => void;
+  viewing?: File;
+  tree: FileTree[];
+  onClick: (path: File) => void;
 };
 
 export const DirectoryList: Component<Props> = (props) => {
+  const tree = createMemo(() => props.tree, undefined, {
+    equals: equal,
+  });
   return (
     <div class="flex flex-col overflow-x-hidden">
-      <For each={props.tree}>
+      <For each={tree()}>
         {(node) =>
           match(node)
-            .with({ type: 'Directory' }, (nd) => (
+            .with({ Directory: P.any }, (nd) => (
               <DirectoryNode
-                tree={nd}
-                selected={props.selected}
+                tree={nd.Directory}
+                viewing={props.viewing}
                 onClick={props.onClick}
               />
             ))
-            .with({ type: 'Image' }, (nd) => (
+            .with({ File: { file_type: 'Image' } }, (nd) => (
               <ImageNode
-                node={nd}
-                isSelected={nd.path === props.selected?.path}
-                onClick={props.onClick}
+                node={nd.File}
+                isSelected={nd.File.key === props.viewing?.key}
+                onClick={() => props.onClick(nd.File)}
               />
             ))
-            .with({ type: 'Video' }, (nd) => (
+            .with({ File: { file_type: 'Video' } }, (nd) => (
               <VideoNode
-                node={nd}
-                isSelected={nd.path === props.selected?.path}
-                onClick={props.onClick}
+                node={nd.File}
+                isSelected={nd.File.key === props.viewing?.key}
+                onClick={() => props.onClick(nd.File)}
               />
             ))
-            .with({ type: 'Zip' }, (nd) => (
+            .with({ File: { file_type: 'Zip' } }, (nd) => (
               <ZipNode
-                node={nd}
-                isSelected={
-                  nd.path + nd.name ===
-                  (props.selected?.path ?? '') + (props.selected?.name ?? '')
-                }
-                onClick={props.onClick}
+                node={nd.File}
+                isSelected={nd.File.key === props.viewing?.key}
+                onClick={() => props.onClick(nd.File)}
               />
             ))
+            .with({ File: P.select() }, () => undefined)
             .exhaustive()
         }
       </For>

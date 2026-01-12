@@ -1,16 +1,17 @@
-import { Component, createEffect } from 'solid-js';
-import { Video } from '../types/DirectoryTree';
+import { createEffect } from 'solid-js';
+import type { Component } from 'solid-js';
+import type { File } from '../../../pages/viewer/ViewerTab';
 import { NodeBaseStyle } from './NodeBaseStyle';
 import { FaSolidVideo } from 'solid-icons/fa';
 
 type Props = {
-  node: Video;
+  node: File;
   isSelected: boolean;
-  onClick?: (path: string) => void;
+  onClick?: () => void;
 };
 
 export const VideoNode: Component<Props> = (props) => {
-  let nodeRef: HTMLDivElement | undefined = undefined;
+  let nodeRef!: HTMLDivElement;
 
   createEffect(() => {
     props.isSelected &&
@@ -28,7 +29,7 @@ export const VideoNode: Component<Props> = (props) => {
       class="pl-3"
       ref={nodeRef}
       isSelected={props.isSelected}
-      onClick={() => props.onClick && props.onClick(props.node.path)}
+      onClick={() => props.onClick && props.onClick()}
     >
       <FaSolidVideo />
       <div class="hidden lg:block">{props.node.name}</div>

@@ -1,17 +1,17 @@
-import { Component, createEffect } from 'solid-js';
-import { Image } from '../types/DirectoryTree';
+import { createEffect } from 'solid-js';
+import type { Component } from 'solid-js';
 import { NodeBaseStyle } from './NodeBaseStyle';
 import { FaSolidImage } from 'solid-icons/fa';
+import type { File } from '../../../pages/viewer/ViewerTab';
 
 type Props = {
-  node: Image;
+  node: File;
   isSelected: boolean;
-  onClick?: (path: string) => void;
+  onClick?: () => void;
 };
 
 export const ImageNode: Component<Props> = (props) => {
-  let nodeRef: HTMLDivElement | undefined = undefined;
-
+  let nodeRef!: HTMLDivElement;
   createEffect(() => {
     props.isSelected &&
       nodeRef &&
@@ -28,7 +28,7 @@ export const ImageNode: Component<Props> = (props) => {
       class="pl-3"
       ref={nodeRef}
       isSelected={props.isSelected}
-      onClick={() => props.onClick && props.onClick(props.node.path)}
+      onClick={() => props.onClick && props.onClick()}
     >
       <FaSolidImage />
       <div class="hidden lg:block">{props.node.name}</div>
