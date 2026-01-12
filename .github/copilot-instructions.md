@@ -49,17 +49,40 @@ simple-image-viewer/
 │   └── assets/                   # 静的アセット
 ├── src-tauri/                    # バックエンド (Rust)
 │   ├── src/
-│   │   ├── app/                  # アプリケーションロジック
+│   │   ├── app/                  # Tauriコマンド層 (AppHandle/Emitter操作)
 │   │   │   ├── explorer.rs       # エクスプローラー機能
 │   │   │   └── viewer.rs         # ビューアー機能
-│   │   ├── service/              # サービス層
-│   │   │   └── app_state.rs      # アプリケーション状態管理
+│   │   ├── service/              # 状態管理層 (AppState操作)
+│   │   │   ├── app_state.rs      # アプリケーション状態定義
+│   │   │   ├── types.rs          # 共通型定義
+│   │   │   ├── viewer_state.rs   # Viewer状態管理
+│   │   │   ├── explorer_state.rs # Explorer状態管理
+│   │   │   └── explorer_types.rs # Explorerソート/検索型
 │   │   └── utils/                # ユーティリティ
 │   │       └── file_utils.rs     # ファイル操作ユーティリティ
 ├── index.html                    # Viewerエントリーポイント
 ├── explorer.html                 # Explorerエントリーポイント
 └── vite.config.ts                # Vite設定 (マルチページ設定)
 ```
+
+## バックエンドのレイヤー設計
+
+### app/ レイヤー (Tauri コマンド層)
+
+- **役割**: `#[tauri::command]` で定義されるエントリーポイント
+- **責務**: `AppHandle` を使用したイベント emit、ウィンドウ操作
+- **依存**: `service/` レイヤーを呼び出して状態操作を委譲
+
+### service/ レイヤー (状態管理層)
+
+- **役割**: `AppState` の操作とビジネスロジック
+- **責務**: 状態の読み書き、ロック管理、データ変換
+- **制約**: `AppHandle` や emit 処理を直接扱わない
+
+### utils/ レイヤー (ユーティリティ層)
+
+- **役割**: 汎用的なヘルパー関数
+- **責務**: ファイル操作、watcher 管理など再利用可能な処理
 
 ## 主要な機能
 
