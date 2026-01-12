@@ -623,99 +623,137 @@ pub(crate) async fn rebuild_recommendations(
 
     tokio::spawn(async move {
         let result = async {
+            use std::sync::atomic::{AtomicUsize, Ordering};
+            use std::sync::Arc as StdArc;
+            use tokio::sync::Semaphore;
+
+            // 並列処理の同時実行数（CPUコア数に基づく）
+            let parallelism = num_cpus::get();
+            let semaphore = StdArc::new(Semaphore::new(parallelism));
+
             let total = folder_entries.len();
             eprintln!(
-                "[rebuild_recommendations] Processing {} folders in {} (force={})",
-                total, directory_path, force
+                "[rebuild_recommendations] Processing {} folders in {} (force={}, parallelism={})",
+                total, directory_path, force, parallelism
             );
 
-            let mut processed = 0;
-            let mut skipped_unchanged = 0;
-            let mut skipped_error = 0;
-
-            for (folder_path, folder_modified) in folder_entries {
-                // 差分チェック: DBに保存された更新日時と比較
-                if !force {
-                    if let Some(&db_modified) = db_modified_map.get(&folder_path) {
-                        if db_modified >= folder_modified {
-                            skipped_unchanged += 1;
-                            continue;
+            // 処理対象をフィルタリング（差分チェック）
+            let entries_to_process: Vec<_> = folder_entries
+                .into_iter()
+                .filter(|(folder_path, folder_modified)| {
+                    if !force {
+                        if let Some(&db_modified) = db_modified_map.get(folder_path) {
+                            if db_modified >= *folder_modified {
+                                return false;
+                            }
                         }
                     }
-                }
+                    true
+                })
+                .collect();
 
-                // フォルダの最初の画像を取得
-                let thumbnail_path = find_first_image_in_folder(std::path::Path::new(&folder_path));
+            let skipped_unchanged = total - entries_to_process.len();
+            let to_process_count = entries_to_process.len();
 
-                if thumbnail_path.is_empty() {
-                    skipped_error += 1;
-                    continue;
-                }
+            eprintln!(
+                "[rebuild_recommendations] {} to process, {} skipped (unchanged)",
+                to_process_count, skipped_unchanged
+            );
 
-                // 画像を読み込み
-                let thumbnail_data = match tokio::fs::read(&thumbnail_path).await {
-                    Ok(data) => data,
-                    Err(e) => {
-                        eprintln!(
-                            "[rebuild_recommendations] Failed to read {}: {}",
-                            thumbnail_path, e
-                        );
-                        skipped_error += 1;
-                        continue;
+            // 共有カウンター
+            let processed = StdArc::new(AtomicUsize::new(0));
+            let skipped_error = StdArc::new(AtomicUsize::new(0));
+
+            // 並列タスクを生成
+            let mut handles = Vec::new();
+
+            for (folder_path, folder_modified) in entries_to_process {
+                let sem = semaphore.clone();
+                let service = service.clone();
+                let db = db.clone();
+                let app_handle = app_handle.clone();
+                let processed = processed.clone();
+                let skipped_error = skipped_error.clone();
+
+                let handle = tokio::spawn(async move {
+                    // セマフォを取得（同時実行数を制限）
+                    let _permit = sem.acquire().await.unwrap();
+
+                    // フォルダの最初の画像を取得
+                    let thumbnail_path =
+                        find_first_image_in_folder(std::path::Path::new(&folder_path));
+
+                    if thumbnail_path.is_empty() {
+                        skipped_error.fetch_add(1, Ordering::Relaxed);
+                        return;
                     }
-                };
 
-                // 画像埋め込みを生成
-                let image_embedding = match service.generate_image_embedding(&thumbnail_data).await
-                {
-                    Ok(emb) => emb,
-                    Err(e) => {
-                        eprintln!(
-                            "[rebuild_recommendations] Failed to generate embedding for {}: {}",
-                            folder_path, e
-                        );
-                        skipped_error += 1;
-                        continue;
+                    // 画像を読み込み
+                    let thumbnail_data = match tokio::fs::read(&thumbnail_path).await {
+                        Ok(data) => data,
+                        Err(_) => {
+                            skipped_error.fetch_add(1, Ordering::Relaxed);
+                            return;
+                        }
+                    };
+
+                    // 画像埋め込みを生成
+                    let image_embedding =
+                        match service.generate_image_embedding(&thumbnail_data).await {
+                            Ok(emb) => emb,
+                            Err(_) => {
+                                skipped_error.fetch_add(1, Ordering::Relaxed);
+                                return;
+                            }
+                        };
+
+                    // DB に保存
+                    if db
+                        .upsert_folder_embedding(
+                            &folder_path,
+                            Some(&thumbnail_data),
+                            &embedding_to_bytes(&image_embedding),
+                            EMBEDDING_VERSION,
+                            folder_modified,
+                        )
+                        .is_err()
+                    {
+                        skipped_error.fetch_add(1, Ordering::Relaxed);
+                        return;
                     }
-                };
 
-                // DB に保存（サムネイルとフォルダ更新日時も一緒に保存）
-                if let Err(e) = db.upsert_folder_embedding(
-                    &folder_path,
-                    Some(&thumbnail_data),
-                    &embedding_to_bytes(&image_embedding),
-                    EMBEDDING_VERSION,
-                    folder_modified,
-                ) {
-                    eprintln!(
-                        "[rebuild_recommendations] Failed to save embedding for {}: {}",
-                        folder_path, e
-                    );
-                    skipped_error += 1;
-                    continue;
-                }
+                    let current = processed.fetch_add(1, Ordering::Relaxed) + 1;
 
-                processed += 1;
+                    // 進捗を通知（20件ごと）
+                    if current % 20 == 0 {
+                        let _ = app_handle.emit(
+                            "rebuild-recommendations-progress",
+                            serde_json::json!({
+                                "processed": current,
+                                "total": total,
+                                "skipped_unchanged": skipped_unchanged,
+                                "skipped_error": skipped_error.load(Ordering::Relaxed)
+                            }),
+                        );
+                    }
+                });
 
-                // 進捗を通知（10件ごと）
-                if processed % 10 == 0 || (processed + skipped_unchanged) % 100 == 0 {
-                    let _ = app_handle.emit(
-                        "rebuild-recommendations-progress",
-                        serde_json::json!({
-                            "processed": processed,
-                            "total": total,
-                            "skipped_unchanged": skipped_unchanged,
-                            "skipped_error": skipped_error
-                        }),
-                    );
-                }
+                handles.push(handle);
             }
+
+            // 全タスクの完了を待つ
+            for handle in handles {
+                let _ = handle.await;
+            }
+
+            let final_processed = processed.load(Ordering::Relaxed);
+            let final_errors = skipped_error.load(Ordering::Relaxed);
 
             eprintln!(
                 "[rebuild_recommendations] Completed: {} processed, {} unchanged, {} errors",
-                processed, skipped_unchanged, skipped_error
+                final_processed, skipped_unchanged, final_errors
             );
-            Ok::<_, String>((processed, skipped_unchanged, skipped_error))
+            Ok::<_, String>((final_processed, skipped_unchanged, final_errors))
         }
         .await;
 
