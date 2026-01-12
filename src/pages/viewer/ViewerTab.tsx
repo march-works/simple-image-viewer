@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
-import { createSignal, onCleanup, onMount } from 'solid-js';
+import { createSignal, createEffect, onCleanup, onMount } from 'solid-js';
 import type { Component } from 'solid-js';
 import { PathSelection } from '../../features/DirectoryTree/routes/PathSelection';
 import { ImageCanvas } from '../../features/Image/ImageCanvas';
@@ -131,6 +131,23 @@ export const ViewerTab: Component<Props> = (props) => {
       label: appWindow.label,
     });
   };
+
+  // 閲覧履歴を記録する (Phase 2: リコメンド基盤)
+  createEffect(() => {
+    const currentViewing = viewing();
+    if (!currentViewing || !props.isActiveTab) return;
+
+    // フォルダパスとサムネイル画像パスを取得
+    const folderPath = props.initialPath;
+    // viewing の path がサムネイルとして使用される画像のパス
+    const thumbnailImagePath = currentViewing.path;
+
+    // バックエンドに閲覧を記録
+    invoke('record_folder_view', {
+      folderPath,
+      thumbnailImagePath,
+    }).catch((e) => console.error('Failed to record folder view:', e));
+  });
 
   return (
     <div class="flex h-full flex-row">

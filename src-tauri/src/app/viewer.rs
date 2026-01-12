@@ -459,3 +459,55 @@ pub(crate) async fn close_viewer_tabs_by_directory(
 
     Ok(())
 }
+
+/// フォルダの閲覧を記録する (Phase 2: リコメンド基盤)
+/// Viewer でファイルを開いた際に呼び出し、閲覧履歴とサムネイルを DB に保存
+#[tauri::command]
+pub(crate) async fn record_folder_view(
+    folder_path: String,
+    thumbnail_image_path: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    use crate::utils::thumbnail_utils::generate_thumbnail_data;
+
+    let db = state.db.clone();
+
+    // バックグラウンドでサムネイル生成と DB 保存を行う
+    tokio::task::spawn_blocking(move || {
+        // サムネイル画像パスが指定されている場合、サムネイルを生成
+        let (thumbnail_blob, thumbnail_hash) = if let Some(ref img_path) = thumbnail_image_path {
+            // 既存のハッシュと比較して変更がある場合のみ再生成
+            let existing_hash = db.get_thumbnail_hash(&folder_path).ok().flatten();
+            let current_hash = crate::utils::thumbnail_utils::calculate_image_hash(img_path).ok();
+
+            if existing_hash.as_ref() != current_hash.as_ref() {
+                // サムネイルを生成
+                match generate_thumbnail_data(img_path) {
+                    Ok(data) => (Some(data.blob), Some(data.hash)),
+                    Err(e) => {
+                        eprintln!("Failed to generate thumbnail: {}", e);
+                        (None, None)
+                    }
+                }
+            } else {
+                // 変更なし、サムネイルは更新しない
+                (None, None)
+            }
+        } else {
+            (None, None)
+        };
+
+        // DB に記録
+        if let Err(e) = db.record_folder_view(
+            &folder_path,
+            thumbnail_blob.as_deref(),
+            thumbnail_hash.as_deref(),
+        ) {
+            eprintln!("Failed to record folder view: {}", e);
+        }
+    })
+    .await
+    .map_err(|e| format!("Failed to spawn blocking task: {}", e))?;
+
+    Ok(())
+}

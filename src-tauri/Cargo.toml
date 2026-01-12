@@ -37,6 +37,11 @@ tauri-plugin-os = "2"
 tauri-plugin-fs = "2"
 tauri-plugin-process = "2"
 
+# Phase 2: SQLite + サムネイルデータ蓄積
+rusqlite = { version = "0.32", features = ["bundled"] }
+image = "0.25"
+sha2 = "0.10"
+
 [features]
 # by default Tauri runs in production mode
 # when `tauri dev` runs it is executed with `cargo run --no-default-features` if `devPath` is an URL

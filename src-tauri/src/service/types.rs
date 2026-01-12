@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
 
+use super::database::Database;
 use super::explorer_state::ExplorerState;
 use super::viewer_state::ViewerState;
 
@@ -36,4 +37,6 @@ pub struct AppState {
     pub watchers: Mutex<HashMap<String, (RecommendedWatcher, usize)>>,
     /// サムネイルキャッシュ (folder_path -> thumbnail_path)
     pub thumbnail_cache: Arc<RwLock<HashMap<String, String>>>,
+    /// SQLite データベース (Phase 2: リコメンド基盤)
+    pub db: Arc<Database>,
 }
