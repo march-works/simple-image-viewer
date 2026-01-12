@@ -8,8 +8,9 @@ use sysinfo::Disks;
 use tauri::State;
 use tokio::sync::RwLock;
 
+use crate::service::explorer_types::{SortConfig, SortField, SortOrder};
+
 use super::types::{ActiveTab, AppState};
-use crate::app::explorer_types::{SortConfig, SortField, SortOrder};
 
 // ========================================
 // 型定義
@@ -156,6 +157,135 @@ pub(crate) async fn remove_explorer_tab_state(
         explorer_state.active = Some(ActiveTab { key: new_key });
     }
     Ok(explorer_state.clone())
+}
+
+// ========================================
+// タブ状態クエリ関数
+// ========================================
+
+/// タブ状態から (path, page, sort, search_query) を取得するタプル
+pub type TabStateQuery = (String, usize, SortConfig, Option<String>);
+
+/// 指定されたキーのタブインデックスを取得する
+pub(crate) async fn get_tab_index_by_key(
+    label: &str,
+    key: &str,
+    state: &State<'_, AppState>,
+) -> Result<usize, String> {
+    let explorers = state.explorers.lock().await;
+    let explorer_state = explorers
+        .iter()
+        .find(|w| w.label == label)
+        .ok_or_else(|| "explorer not found".to_string())?;
+    explorer_state
+        .tabs
+        .iter()
+        .position(|t| t.key == key)
+        .ok_or_else(|| "tab not found".to_string())
+}
+
+/// アクティブタブの状態 (path, page, sort, search_query) を取得する
+pub(crate) async fn get_active_tab_state_query(
+    label: &str,
+    state: &State<'_, AppState>,
+    page_modifier: impl FnOnce(usize) -> usize,
+) -> Result<(usize, TabStateQuery), String> {
+    let explorers = state.explorers.lock().await;
+    let explorer_state = explorers
+        .iter()
+        .find(|w| w.label == label)
+        .ok_or_else(|| "explorer not found".to_string())?;
+    let active_key = explorer_state
+        .active
+        .as_ref()
+        .ok_or_else(|| "no active tab".to_string())?
+        .key
+        .clone();
+    let index = explorer_state
+        .tabs
+        .iter()
+        .position(|t| t.key == active_key)
+        .ok_or_else(|| "tab not found".to_string())?;
+    let tab = &explorer_state.tabs[index];
+    Ok((
+        index,
+        (
+            tab.path.clone().unwrap_or_default(),
+            page_modifier(tab.page),
+            tab.sort.clone(),
+            tab.search_query.clone(),
+        ),
+    ))
+}
+
+/// 指定されたキーのタブ状態 (path, page, sort, search_query) を取得する
+pub(crate) async fn get_tab_state_query_by_key(
+    label: &str,
+    key: &str,
+    state: &State<'_, AppState>,
+) -> Result<(usize, TabStateQuery), String> {
+    let explorers = state.explorers.lock().await;
+    let explorer_state = explorers
+        .iter()
+        .find(|w| w.label == label)
+        .ok_or_else(|| "explorer not found".to_string())?;
+    let index = explorer_state
+        .tabs
+        .iter()
+        .position(|t| t.key == key)
+        .ok_or_else(|| "tab not found".to_string())?;
+    let tab = &explorer_state.tabs[index];
+    Ok((
+        index,
+        (
+            tab.path.clone().unwrap_or_default(),
+            tab.page,
+            tab.sort.clone(),
+            tab.search_query.clone(),
+        ),
+    ))
+}
+
+/// 指定されたインデックスのタブ状態を取得する
+pub(crate) async fn get_tab_state_by_index(
+    label: &str,
+    index: usize,
+    state: &State<'_, AppState>,
+) -> Result<ExplorerTabState, String> {
+    let explorers = state.explorers.lock().await;
+    let explorer_state = explorers
+        .iter()
+        .find(|w| w.label == label)
+        .ok_or_else(|| "explorer not found".to_string())?;
+    explorer_state
+        .tabs
+        .get(index)
+        .cloned()
+        .ok_or_else(|| "tab not found".to_string())
+}
+
+/// タブの状態を更新して更新後の状態を返す
+pub(crate) async fn update_tab_state(
+    label: &str,
+    index: usize,
+    page: usize,
+    thumbnails: Vec<Thumbnail>,
+    total_pages: usize,
+    state: &State<'_, AppState>,
+) -> Result<ExplorerTabState, String> {
+    let mut explorers = state.explorers.lock().await;
+    let explorer_state = explorers
+        .iter_mut()
+        .find(|w| w.label == label)
+        .ok_or_else(|| "explorer not found".to_string())?;
+    let tab = explorer_state
+        .tabs
+        .get_mut(index)
+        .ok_or_else(|| "tab not found".to_string())?;
+    tab.page = page;
+    tab.folders = thumbnails;
+    tab.end = total_pages;
+    Ok(tab.clone())
 }
 
 // ========================================
