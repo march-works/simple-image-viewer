@@ -107,47 +107,7 @@ pub fn create_viewer() -> Builder<Wry> {
     let db_path = app_dir.join("data.db");
     let db = Database::init(&db_path).expect("Failed to initialize database");
 
-    // Initialize CLIP embedding service (Phase 4)
-    // モデルファイルが存在する場合のみ初期化
-    let embedding_service = {
-        let resource_dir = app_dir.clone();
-        // 開発時は src-tauri/resources から、本番時は bundled resources から読み込む
-        let vision_path = resource_dir.join("resources").join("vision_model.onnx");
-        let text_path = resource_dir.join("resources").join("text_model.onnx");
-
-        if vision_path.exists() && text_path.exists() {
-            match EmbeddingService::init(&resource_dir.join("resources")) {
-                Ok(service) => {
-                    println!("CLIP embedding service initialized");
-                    Some(std::sync::Arc::new(service))
-                }
-                Err(e) => {
-                    eprintln!("Failed to initialize embedding service: {}", e);
-                    None
-                }
-            }
-        } else {
-            // 開発時: src-tauri/resources から読み込む
-            let dev_resource_dir =
-                std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources");
-            if dev_resource_dir.join("vision_model.onnx").exists() {
-                match EmbeddingService::init(&dev_resource_dir) {
-                    Ok(service) => {
-                        println!("CLIP embedding service initialized (dev mode)");
-                        Some(std::sync::Arc::new(service))
-                    }
-                    Err(e) => {
-                        eprintln!("Failed to initialize embedding service: {}", e);
-                        None
-                    }
-                }
-            } else {
-                println!("CLIP models not found, recommendation feature disabled");
-                None
-            }
-        }
-    };
-
+    // embedding_service は setup 時に初期化するため、ここでは None で初期化
     let app_state = AppState {
         count: Mutex::new(saved_state.count),
         active: Mutex::new(saved_state.active),
@@ -158,7 +118,7 @@ pub fn create_viewer() -> Builder<Wry> {
             std::collections::HashMap::new(),
         )),
         db: std::sync::Arc::new(db),
-        embedding_service,
+        embedding_service: tokio::sync::RwLock::new(None),
     };
     let viewers_to_restore = saved_state.viewers.clone();
     let explorers_to_restore = saved_state.explorers.clone();
@@ -210,6 +170,112 @@ pub fn create_viewer() -> Builder<Wry> {
             let quit_item = MenuItemBuilder::with_id("quit", "Quit").build(app)?;
             let menu = MenuBuilder::new(app).item(&quit_item).build()?;
             app.set_menu(menu)?;
+
+            // Initialize CLIP embedding service (Phase 4)
+            // AppHandle からリソースパスを取得して初期化
+            let app_handle = app.app_handle().clone();
+            tokio::spawn(async move {
+                let resource_dir = app_handle
+                    .path()
+                    .resource_dir()
+                    .ok()
+                    .map(|p| p.join("resources"));
+
+                let dev_resource_dir =
+                    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources");
+
+                // 本番ビルド: バンドルされたリソースを使用
+                // 開発ビルド: src-tauri/resources を使用
+                let embedding_service = if let Some(ref res_dir) = resource_dir {
+                    let vision_path = res_dir.join("vision_model.onnx");
+                    let text_path = res_dir.join("text_model.onnx");
+                    eprintln!(
+                        "[embedding] Checking bundled resources: {:?} (exists: {}, {})",
+                        res_dir,
+                        vision_path.exists(),
+                        text_path.exists()
+                    );
+                    if vision_path.exists() && text_path.exists() {
+                        // ファイルサイズをチェック（1KB以下はLFSポインタの可能性）
+                        let vision_size = std::fs::metadata(&vision_path)
+                            .map(|m| m.len())
+                            .unwrap_or(0);
+                        let text_size = std::fs::metadata(&text_path).map(|m| m.len()).unwrap_or(0);
+                        eprintln!(
+                            "[embedding] File sizes: vision={}B, text={}B",
+                            vision_size, text_size
+                        );
+                        if vision_size > 1024 * 1024 && text_size > 1024 * 1024 {
+                            match EmbeddingService::init(res_dir) {
+                                Ok(service) => {
+                                    eprintln!(
+                                        "[embedding] CLIP embedding service initialized (bundled)"
+                                    );
+                                    Some(std::sync::Arc::new(service))
+                                }
+                                Err(e) => {
+                                    eprintln!(
+                                        "[embedding] Failed to initialize embedding service: {}",
+                                        e
+                                    );
+                                    None
+                                }
+                            }
+                        } else {
+                            eprintln!("[embedding] ONNX files too small, may be LFS pointers");
+                            None
+                        }
+                    } else if dev_resource_dir.join("vision_model.onnx").exists()
+                        && dev_resource_dir.join("text_model.onnx").exists()
+                    {
+                        // フォールバック: 開発用リソース
+                        eprintln!("[embedding] Using dev resources: {:?}", dev_resource_dir);
+                        match EmbeddingService::init(&dev_resource_dir) {
+                            Ok(service) => {
+                                eprintln!(
+                                    "[embedding] CLIP embedding service initialized (dev mode)"
+                                );
+                                Some(std::sync::Arc::new(service))
+                            }
+                            Err(e) => {
+                                eprintln!(
+                                    "[embedding] Failed to initialize embedding service: {}",
+                                    e
+                                );
+                                None
+                            }
+                        }
+                    } else {
+                        eprintln!(
+                            "[embedding] CLIP models not found, recommendation feature disabled"
+                        );
+                        None
+                    }
+                } else if dev_resource_dir.join("vision_model.onnx").exists() {
+                    // resource_dir が取得できない場合は開発モードとみなす
+                    eprintln!(
+                        "[embedding] Using dev resources (no resource_dir): {:?}",
+                        dev_resource_dir
+                    );
+                    match EmbeddingService::init(&dev_resource_dir) {
+                        Ok(service) => {
+                            eprintln!("[embedding] CLIP embedding service initialized (dev mode)");
+                            Some(std::sync::Arc::new(service))
+                        }
+                        Err(e) => {
+                            eprintln!("[embedding] Failed to initialize embedding service: {}", e);
+                            None
+                        }
+                    }
+                } else {
+                    eprintln!("[embedding] CLIP models not found, recommendation feature disabled");
+                    None
+                };
+
+                // AppHandle から state を取得して embedding_service を設定
+                let state = app_handle.state::<AppState>();
+                *state.embedding_service.write().await = embedding_service;
+            });
 
             // Restore windows from saved state
             viewers_to_restore.iter().for_each(|v| {
