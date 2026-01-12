@@ -45,6 +45,7 @@ export const Folder: Component<Props> = (props) => {
         class="block cursor-pointer w-40 h-40 object-contain"
         onClick={() => props.onClick(props.thumb)}
         src={data()}
+        loading="lazy"
         onError={(e) => (e.currentTarget.src = fallback)}
       />
       <div class="whitespace-nowrap text-ellipsis">{props.thumb.filename}</div>

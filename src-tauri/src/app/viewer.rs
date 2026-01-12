@@ -1,8 +1,7 @@
 use base64::{engine::general_purpose, Engine as _};
-use notify::{recommended_watcher, RecursiveMode, Watcher};
+use notify::RecursiveMode;
 use std::fs::File as StdFile;
 use std::io::{BufReader, Read};
-use std::path::Path;
 use tauri::{AppHandle, Emitter, State, WebviewWindow};
 
 use crate::service::app_state::{
@@ -12,6 +11,35 @@ use crate::service::app_state::{
 };
 
 use crate::utils::file_utils::normalize_path;
+use crate::utils::watcher_utils::{
+    create_viewer_watcher_callback, subscribe_directory, unsubscribe_directory,
+};
+
+/// Viewer状態変更時に全Explorerにアクティブディレクトリを通知する共通関数
+async fn notify_active_directory_to_explorers(
+    viewer_state: &crate::service::app_state::ViewerState,
+    state: &State<'_, AppState>,
+    app: &AppHandle,
+) -> Result<(), String> {
+    let active_dir = viewer_state.active.as_ref().and_then(|active_tab| {
+        viewer_state
+            .tabs
+            .iter()
+            .find(|tab| tab.key == active_tab.key)
+            .map(|tab| normalize_path(&tab.path))
+    });
+
+    let explorers = state.explorers.lock().await;
+    for explorer in explorers.iter() {
+        let _ = app.emit_to(
+            &explorer.label,
+            "active-viewer-directory-changed",
+            active_dir.clone(),
+        );
+    }
+
+    Ok(())
+}
 
 /// ディレクトリ監視を開始する
 /// watcherはAppStateで管理し、同じパスへの監視は参照カウントで共有する
@@ -22,38 +50,9 @@ pub(crate) async fn subscribe_dir_notification(
     state: State<'_, AppState>,
     app: AppHandle,
 ) -> Result<(), String> {
-    let mut watchers = state.watchers.lock().await;
+    let callback = create_viewer_watcher_callback(app, filepath.clone());
 
-    // 既に同じパスの監視がある場合は参照カウントを増やすだけ
-    if let Some((_, ref_count)) = watchers.get_mut(&filepath) {
-        *ref_count += 1;
-        return Ok(());
-    }
-
-    // 新しいwatcherを作成
-    let path_inner = filepath.clone();
-    let watcher = recommended_watcher(move |res| match res {
-        Ok(_) => {
-            app.emit("directory-tree-changed", &path_inner)
-                .unwrap_or_default();
-        }
-        Err(_) => {
-            app.emit(
-                "directory-watch-error",
-                "Error occured while directory watching",
-            )
-            .unwrap_or_default();
-        }
-    })
-    .map_err(|e| format!("failed to create watcher: {}", e))?;
-
-    let mut watcher = watcher;
-    watcher
-        .watch(Path::new(&filepath), RecursiveMode::Recursive)
-        .map_err(|e| format!("failed to watch directory: {}", e))?;
-
-    watchers.insert(filepath, (watcher, 1));
-    Ok(())
+    subscribe_directory(filepath, &state, RecursiveMode::Recursive, callback).await
 }
 
 /// ディレクトリ監視を解除する
@@ -63,15 +62,7 @@ pub(crate) async fn unsubscribe_dir_notification(
     filepath: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let mut watchers = state.watchers.lock().await;
-
-    if let Some((_, ref_count)) = watchers.get_mut(&filepath) {
-        *ref_count -= 1;
-        if *ref_count == 0 {
-            watchers.remove(&filepath);
-        }
-    }
-    Ok(())
+    unsubscribe_directory(filepath, &state).await
 }
 
 /// ディレクトリ変更通知を受けてファイルツリーを再構築する
@@ -172,27 +163,12 @@ pub(crate) async fn change_active_viewer<'a>(
     drop(label);
 
     let viewers = state.viewers.lock().await;
-    let active_dir = viewers
+    let viewer_state = viewers
         .iter()
         .find(|v| v.label == active_label)
-        .and_then(|viewer| {
-            viewer.active.as_ref().and_then(|active_tab| {
-                viewer
-                    .tabs
-                    .iter()
-                    .find(|tab| tab.key == active_tab.key)
-                    .map(|tab| normalize_path(&tab.path))
-            })
-        });
+        .ok_or_else(|| "active viewer not found".to_string())?;
 
-    let explorers = state.explorers.lock().await;
-    for explorer in explorers.iter() {
-        let _ = app.emit_to(
-            &explorer.label,
-            "active-viewer-directory-changed",
-            active_dir.clone(),
-        );
-    }
+    notify_active_directory_to_explorers(viewer_state, &state, &app).await?;
 
     Ok(())
 }
@@ -235,6 +211,10 @@ pub(crate) async fn remove_viewer_tab<'a>(
     let viewer_state = remove_viewer_tab_state(&label, &key, &state).await?;
     app.emit_to(&label, "viewer-state-changed", viewer_state.clone())
         .map_err(|_| "failed to emit viewer state".to_string())?;
+
+    // タブを閉じた後の新しいアクティブディレクトリを全Explorerに通知
+    notify_active_directory_to_explorers(&viewer_state, &state, &app).await?;
+
     Ok(())
 }
 
@@ -255,20 +235,7 @@ pub(crate) async fn change_active_viewer_tab<'a>(
         .map_err(|_| "failed to emit viewer state".to_string())?;
 
     // アクティブなタブのディレクトリを全Explorerに通知
-    let active_dir = viewer_state
-        .tabs
-        .iter()
-        .find(|tab| tab.key == key)
-        .map(|tab| normalize_path(&tab.path));
-
-    let explorers = state.explorers.lock().await;
-    for explorer in explorers.iter() {
-        let _ = app.emit_to(
-            &explorer.label,
-            "active-viewer-directory-changed",
-            active_dir.clone(),
-        );
-    }
+    notify_active_directory_to_explorers(viewer_state, &state, &app).await?;
 
     Ok(())
 }
