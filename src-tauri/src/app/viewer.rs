@@ -4,10 +4,10 @@ use std::fs::File as StdFile;
 use std::io::{BufReader, Read};
 use tauri::{AppHandle, Emitter, State, WebviewWindow};
 
-use crate::service::app_state::{
+use crate::service::app_state::{open_file_pick_dialog, ActiveTab, ActiveViewer, AppState};
+use crate::service::viewer_state::{
     add_viewer_state, add_viewer_tab_state, find_key_in_tree, get_next_in_tree, get_prev_in_tree,
-    open_file_pick_dialog, rebuild_file_tree, remove_viewer_tab_state, ActiveTab, ActiveViewer,
-    AppState, File,
+    rebuild_file_tree, remove_viewer_tab_state, File,
 };
 
 use crate::utils::file_utils::normalize_path;
@@ -17,7 +17,7 @@ use crate::utils::watcher_utils::{
 
 /// Viewer状態変更時に全Explorerにアクティブディレクトリを通知する共通関数
 async fn notify_active_directory_to_explorers(
-    viewer_state: &crate::service::app_state::ViewerState,
+    viewer_state: &crate::service::viewer_state::ViewerState,
     state: &State<'_, AppState>,
     app: &AppHandle,
 ) -> Result<(), String> {
