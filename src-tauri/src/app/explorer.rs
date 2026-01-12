@@ -570,10 +570,13 @@ pub(crate) async fn rebuild_recommendations(
 
     let force = force_rebuild.unwrap_or(false);
 
-    let embedding_service = state
-        .embedding_service
-        .as_ref()
-        .ok_or_else(|| "Embedding service not available".to_string())?;
+    let embedding_service = {
+        let guard = state.embedding_service.read().await;
+        guard
+            .as_ref()
+            .cloned()
+            .ok_or_else(|| "Embedding service not available".to_string())?
+    };
 
     // 既に処理中の場合はエラー
     if embedding_service.is_processing().await {
@@ -809,7 +812,8 @@ fn find_first_image_in_folder(folder_path: &std::path::Path) -> String {
 pub(crate) async fn is_rebuilding_recommendations(
     state: State<'_, AppState>,
 ) -> Result<bool, String> {
-    match &state.embedding_service {
+    let guard = state.embedding_service.read().await;
+    match guard.as_ref() {
         Some(service) => Ok(service.is_processing().await),
         None => Ok(false),
     }
@@ -832,11 +836,14 @@ pub(crate) async fn get_recommendation_scores(
     let mut scores = std::collections::HashMap::new();
 
     // 埋め込みサービスがない場合はすべて 0 スコア
-    if state.embedding_service.is_none() {
-        for path in &folder_paths {
-            scores.insert(path.clone(), 0.0);
+    {
+        let guard = state.embedding_service.read().await;
+        if guard.is_none() {
+            for path in &folder_paths {
+                scores.insert(path.clone(), 0.0);
+            }
+            return Ok(scores);
         }
-        return Ok(scores);
     }
 
     // 直近閲覧したフォルダの埋め込みを取得

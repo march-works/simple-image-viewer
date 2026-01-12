@@ -41,5 +41,6 @@ pub struct AppState {
     /// SQLite データベース (Phase 2: リコメンド基盤)
     pub db: Arc<Database>,
     /// CLIP 埋め込みサービス (Phase 4: ML リコメンド)
-    pub embedding_service: Option<Arc<EmbeddingService>>,
+    /// RwLock でラップして setup 時に初期化できるようにする
+    pub embedding_service: RwLock<Option<Arc<EmbeddingService>>>,
 }
