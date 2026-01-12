@@ -2,20 +2,18 @@ use fs_extra::dir::{move_dir, CopyOptions};
 use notify::RecursiveMode;
 use tauri::{AppHandle, Emitter, State, WebviewUrl, WebviewWindowBuilder};
 
-use crate::service::app_state::{ActiveTab, AppState};
+use crate::service::app_state::AppState;
 use crate::service::explorer_state::{
-    add_explorer_state, add_explorer_tab_state, explore_path_with_count, remove_explorer_tab_state,
-    reset_explorer_tab_state,
+    add_explorer_state, add_explorer_tab_state, explore_path_with_count,
+    get_active_tab_state_query, get_tab_index_by_key, get_tab_state_by_index,
+    get_tab_state_query_by_key, remove_explorer_tab_state, reset_explorer_tab_state,
+    update_tab_state, Thumbnail,
 };
+use crate::service::explorer_types::SortConfig;
+use crate::service::types::ActiveTab;
 use crate::utils::watcher_utils::{
     create_explorer_watcher_callback, subscribe_directory, unsubscribe_directory,
 };
-
-use super::explorer_helpers::{
-    emit_current_tab_state, get_active_tab_state_query, get_tab_index_by_key,
-    get_tab_state_query_by_key, update_tab_and_emit,
-};
-use super::explorer_types::SortConfig;
 
 #[tauri::command]
 pub(crate) async fn transfer_folder(
@@ -230,6 +228,47 @@ pub(crate) async fn change_explorer_transfer_path(
     Ok(())
 }
 
+// ========================================
+// イベント発行ヘルパー（app レイヤー専用）
+// ========================================
+
+use crate::service::explorer_state::ExplorerTabState;
+
+/// タブ状態変更イベントを発行する
+fn emit_tab_state(
+    label: &str,
+    tab_state: &ExplorerTabState,
+    app: &AppHandle,
+) -> Result<(), String> {
+    app.emit_to(label, "explorer-tab-state-changed", tab_state)
+        .map_err(|_| "failed to emit explorer state".to_string())
+}
+
+/// タブの状態を更新してイベントを発行する
+async fn update_tab_and_emit(
+    label: &str,
+    index: usize,
+    page: usize,
+    thumbnails: Vec<Thumbnail>,
+    total_pages: usize,
+    state: &State<'_, AppState>,
+    app: &AppHandle,
+) -> Result<(), String> {
+    let tab_state = update_tab_state(label, index, page, thumbnails, total_pages, state).await?;
+    emit_tab_state(label, &tab_state, app)
+}
+
+/// 現在のタブ状態をそのまま emit する（ローディング解除用）
+async fn emit_current_tab_state(
+    label: &str,
+    index: usize,
+    state: &State<'_, AppState>,
+    app: &AppHandle,
+) -> Result<(), String> {
+    let tab_state = get_tab_state_by_index(label, index, state).await?;
+    emit_tab_state(label, &tab_state, app)
+}
+
 #[tauri::command]
 pub(crate) async fn change_explorer_page(
     page: usize,
@@ -249,7 +288,8 @@ pub(crate) async fn change_explorer_page(
         search_query.as_deref(),
     )
     .await?;
-    update_tab_and_emit(&label, index, page, thumbnails, total_pages, &state, &app).await?;
+    let tab_state = update_tab_state(&label, index, page, thumbnails, total_pages, &state).await?;
+    emit_tab_state(&label, &tab_state, &app)?;
     Ok(())
 }
 
