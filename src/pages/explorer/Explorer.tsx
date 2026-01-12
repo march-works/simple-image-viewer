@@ -4,6 +4,7 @@ import { ExplorerTab, TabState } from './ExplorerTab';
 import { UnlistenFn } from '@tauri-apps/api/event';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { invoke } from '@tauri-apps/api/core';
+import { ModelDownloadProgress } from '../../components/ModelDownloadProgress/ModelDownloadProgress';
 const appWindow = getCurrentWebviewWindow();
 
 type ExplorerState = {
@@ -66,6 +67,7 @@ const Explorer = () => {
           />
         )}
       />
+      <ModelDownloadProgress />
     </div>
   );
 };
