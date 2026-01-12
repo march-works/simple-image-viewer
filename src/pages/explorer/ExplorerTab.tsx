@@ -8,9 +8,16 @@ import {
   onMount,
 } from 'solid-js';
 import type { Component } from 'solid-js';
+import { debounce } from '@solid-primitives/scheduled';
 import { Pagination } from '../../components/Pagination/Pagination';
 import { Folder } from '../../features/Folder/routes/Folder';
 import type { Thumbnail } from '../../features/Folder/types/Thumbnail';
+import {
+  SortConfig,
+  defaultSortConfig,
+  getSortOptionIndex,
+  sortOptions,
+} from '../../features/Explorer/types/ExplorerQuery';
 import { invoke } from '@tauri-apps/api/core';
 import { open } from '@tauri-apps/plugin-dialog';
 import { FaSolidFolderOpen } from 'solid-icons/fa';
@@ -27,6 +34,8 @@ export type TabState = {
   page: number;
   end: number;
   folders: Thumbnail[];
+  sort?: SortConfig;
+  search_query?: string;
 };
 
 type Props = {
@@ -44,9 +53,22 @@ export const ExplorerTab: Component<Props> = (props) => {
   const [activeViewerDir, setActiveViewerDir] = createSignal<
     string | undefined
   >();
+  const [sortConfig, setSortConfig] =
+    createSignal<SortConfig>(defaultSortConfig);
+  const [searchInput, setSearchInput] = createSignal<string>('');
   let unListenRef: UnlistenFn | undefined = undefined;
   let activeViewerDirListenRef: UnlistenFn | undefined = undefined;
   let divRef!: HTMLDivElement;
+
+  // デバウンスされた検索実行関数
+  const debouncedSearch = debounce((value: string) => {
+    setIsLoading(true);
+    invoke('change_explorer_search', {
+      label: appWindow.label,
+      key: props.tabKey,
+      query: value || null,
+    });
+  }, 300);
 
   // アクティブなViewerのアクティブなタブのディレクトリを取得
   const updateActiveViewerDirectory = async () => {
@@ -71,11 +93,17 @@ export const ExplorerTab: Component<Props> = (props) => {
           page,
           end,
           folders,
+          sort,
+          search_query,
         } = event.payload as TabState;
         if (key !== props.tabKey) return;
         setPagination([page, end]);
         setTransferPath(transferPath);
         setFolders(folders);
+        if (sort) {
+          setSortConfig(sort);
+        }
+        setSearchInput(search_query ?? '');
         setIsLoading(false);
       },
     );
@@ -202,11 +230,34 @@ export const ExplorerTab: Component<Props> = (props) => {
     });
   };
 
+  const handleSortChange = (index: number) => {
+    const option = sortOptions[index];
+    if (!option) return;
+    setIsLoading(true);
+    setSortConfig(option.config);
+    invoke('change_explorer_sort', {
+      label: appWindow.label,
+      key: props.tabKey,
+      sort: option.config,
+    });
+  };
+
+  const handleSearchInput = (value: string) => {
+    setSearchInput(value);
+    debouncedSearch(value);
+  };
+
   const handleOnKeyDown = (event: KeyboardEvent) => {
     if (!props.isActiveTab) return;
-    event.preventDefault();
-    if (event.key === 'ArrowLeft') moveBackward();
-    else if (event.key === 'ArrowRight') moveForward();
+    // input要素にフォーカスがある場合は無視
+    if (event.target instanceof HTMLInputElement) return;
+    if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      moveBackward();
+    } else if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      moveForward();
+    }
   };
 
   const handleOnButtonDown = (event: MouseEvent) => {
@@ -222,6 +273,8 @@ export const ExplorerTab: Component<Props> = (props) => {
   onCleanup(() => {
     document.removeEventListener('keydown', handleOnKeyDown, false);
     document.removeEventListener('mouseup', handleOnButtonDown, false);
+    // デバウンスをクリア
+    debouncedSearch.clear();
     // Tauriイベントリスナーを解除
     unListenRef?.();
     activeViewerDirListenRef?.();
@@ -229,7 +282,7 @@ export const ExplorerTab: Component<Props> = (props) => {
 
   return (
     <div class="h-full flex flex-col overflow-hidden">
-      <div class="p-1 h-12 flex flex-row gap-2">
+      <div class="p-1 h-12 flex flex-row gap-2 items-center">
         <div
           class="ml-1 flex h-8 w-8 shrink-0 flex-col items-center justify-center rounded-full border-2 border-neutral-500 bg-neutral-900 text-neutral-400 transition-colors hover:bg-neutral-700 hover:text-neutral-300"
           onClick={() => resetTab()}
@@ -237,7 +290,7 @@ export const ExplorerTab: Component<Props> = (props) => {
           <FaSolidFolderOpen class="ml-0.5 h-5 w-5" />
         </div>
         <div
-          class="mr-1 p-2 flex flex-row h-8 shrink-0 items-center justify-center rounded-full border-2 border-neutral-500 bg-neutral-900 text-neutral-400 transition-colors hover:bg-neutral-700 hover:text-neutral-300"
+          class="p-2 flex flex-row h-8 shrink-0 items-center justify-center rounded-full border-2 border-neutral-500 bg-neutral-900 text-neutral-400 transition-colors hover:bg-neutral-700 hover:text-neutral-300"
           onClick={() => selectTransferPath()}
         >
           <RiDocumentFolderTransferFill class="ml-0.5 h-5 w-5" />
@@ -245,6 +298,23 @@ export const ExplorerTab: Component<Props> = (props) => {
             {transferPath() ? '転送先を変更する' : '転送先を設定する'}
           </span>
         </div>
+        <div class="flex-1" />
+        <input
+          type="text"
+          placeholder="検索..."
+          value={searchInput()}
+          onInput={(e) => handleSearchInput(e.currentTarget.value)}
+          class="h-8 px-3 w-48 rounded-lg border-2 border-neutral-500 bg-neutral-900 text-neutral-300 text-sm placeholder-neutral-500 focus:outline-none focus:border-neutral-400"
+        />
+        <select
+          value={getSortOptionIndex(sortConfig())}
+          onChange={(e) => handleSortChange(parseInt(e.currentTarget.value))}
+          class="h-8 px-2 mr-1 rounded-lg border-2 border-neutral-500 bg-neutral-900 text-neutral-300 text-sm focus:outline-none focus:border-neutral-400"
+        >
+          <For each={sortOptions}>
+            {(option, index) => <option value={index()}>{option.label}</option>}
+          </For>
+        </select>
       </div>
       <Show
         when={!isLoading()}
