@@ -12,33 +12,27 @@ type Props = {
   activeViewerDir: string | undefined;
   onFolderClick: (thumb: Thumbnail) => void;
   onMarkedAsRead: (path: string) => void;
-  divRef: (el: HTMLDivElement) => void;
 };
 
 export const FolderGrid: Component<Props> = (props) => {
-  let innerDivRef: HTMLDivElement | undefined;
+  let divRef: HTMLDivElement | undefined;
 
   // フォルダリストが変更されたらスクロールをリセット
   createEffect(
     on(
       () => props.folders,
       () => {
-        if (innerDivRef) {
-          innerDivRef.scrollTop = 0;
+        if (divRef) {
+          divRef.scrollTop = 0;
         }
       },
     ),
   );
 
-  const setRef = (el: HTMLDivElement) => {
-    innerDivRef = el;
-    props.divRef(el);
-  };
-
   return (
     <Show when={!props.isLoading} fallback={<Loading size="lg" />}>
       <div
-        ref={setRef}
+        ref={divRef}
         class="relative flex flex-row flex-wrap p-5 gap-5 overflow-auto"
       >
         <For each={props.folders}>

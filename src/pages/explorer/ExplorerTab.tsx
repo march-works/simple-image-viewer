@@ -23,9 +23,26 @@ export const ExplorerTab: Component<Props> = (props) => {
     activeViewerDir,
     sortConfig,
     searchInput,
-    divRef,
-    actions,
-  } = useExplorerTab(props.tabKey, props.isActiveTab);
+    selectTransferPath,
+    onFolderClick,
+    transferFolder,
+    closeViewerTabsForDirectory,
+    resetTab,
+    movePage,
+    moveForward,
+    moveBackward,
+    moveFirst,
+    moveLast,
+    handleSortChange,
+    handleSearchInput,
+  } = useExplorerTab(props.tabKey, () => props.isActiveTab);
+
+  const handleMarkedAsRead = (path: string) => {
+    const to = transferPath();
+    if (!to) return;
+    transferFolder(path, to);
+    closeViewerTabsForDirectory(path);
+  };
 
   return (
     <div class="h-full flex flex-col overflow-hidden">
@@ -33,29 +50,28 @@ export const ExplorerTab: Component<Props> = (props) => {
         transferPath={transferPath()}
         sortConfig={sortConfig()}
         searchInput={searchInput()}
-        onResetTab={actions.resetTab}
-        onSelectTransferPath={actions.selectTransferPath}
-        onSearchInput={actions.handleSearchInput}
-        onSortChange={actions.handleSortChange}
+        onResetTab={resetTab}
+        onSelectTransferPath={selectTransferPath}
+        onSearchInput={handleSearchInput}
+        onSortChange={handleSortChange}
       />
       <FolderGrid
         folders={folders()}
         isLoading={isLoading()}
         transferPath={transferPath()}
         activeViewerDir={activeViewerDir()}
-        onFolderClick={actions.onClick}
-        onMarkedAsRead={actions.handleMarkedAsRead}
-        divRef={divRef}
+        onFolderClick={onFolderClick}
+        onMarkedAsRead={handleMarkedAsRead}
       />
       <div class="p-1 h-12 self-center">
         <Pagination
           current={pagination()[0]}
           end={pagination()[1]}
-          onClickPrev={actions.moveBackward}
-          onClickNext={actions.moveForward}
-          onClickPage={actions.movePage}
-          onClickStart={actions.moveFirst}
-          onClickEnd={actions.moveLast}
+          onClickPrev={moveBackward}
+          onClickNext={moveForward}
+          onClickPage={movePage}
+          onClickStart={moveFirst}
+          onClickEnd={moveLast}
         />
       </div>
     </div>
