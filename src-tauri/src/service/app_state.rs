@@ -740,66 +740,6 @@ pub(crate) async fn explore_path_with_count(
     Ok((thumbnails, total_pages))
 }
 
-// 旧関数は互換性のため残す (内部的には新関数を呼ぶ)
-pub(crate) fn explore_path(filepath: &str, page: usize) -> Result<Vec<Thumbnail>, String> {
-    use std::time::UNIX_EPOCH;
-
-    // 同期版 - キャッシュなしで動作
-    let dirs = read_dir(filepath).map_err(|_| "failed to open path")?;
-    let mut entries: Vec<_> = dirs
-        .filter_map(|e| e.ok())
-        .filter(|e| e.path().is_dir())
-        .collect();
-
-    entries.sort_by_key(|a| a.file_name());
-
-    let total_count = entries.len();
-    let start = (page.saturating_sub(1)) * CATALOG_PER_PAGE;
-    let end = (start + CATALOG_PER_PAGE).min(total_count);
-
-    if start >= total_count {
-        return Ok(vec![]);
-    }
-
-    let page_entries = &entries[start..end];
-
-    let mut thumbs = vec![];
-    for entry in page_entries {
-        let thumbpath = find_first_image_in_folder(&entry.path());
-        let metadata = entry.metadata().ok();
-        let modified = metadata
-            .as_ref()
-            .and_then(|m| m.modified().ok())
-            .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-            .map(|d| d.as_secs());
-        let created = metadata
-            .as_ref()
-            .and_then(|m| m.created().ok())
-            .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-            .map(|d| d.as_secs());
-        thumbs.push(Thumbnail {
-            path: entry.path().to_str().unwrap_or_default().to_string(),
-            filename: entry.file_name().to_str().unwrap_or_default().to_string(),
-            thumbpath,
-            modified_at: modified,
-            created_at: created,
-        });
-    }
-
-    Ok(thumbs)
-}
-
-pub(crate) async fn get_page_count(filepath: &str) -> Result<usize, String> {
-    let dirs = read_dir(filepath).map_err(|_| "failed to open inner path")?;
-    let count = dirs
-        .filter(|e| e.as_ref().map(|e| e.path().is_dir()).unwrap_or(false))
-        .count();
-    if count == 0 {
-        return Ok(1);
-    }
-    Ok(count.div_ceil(CATALOG_PER_PAGE))
-}
-
 pub(crate) fn get_devices() -> Result<Vec<Thumbnail>, String> {
     let disks = Disks::new_with_refreshed_list();
     Ok(disks
