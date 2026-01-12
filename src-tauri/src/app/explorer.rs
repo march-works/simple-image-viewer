@@ -11,6 +11,7 @@ use crate::utils::watcher_utils::{
 };
 
 use super::explorer_helpers::{get_active_tab_index, get_tab_index_by_key, update_tab_and_emit};
+use super::explorer_types::SortConfig;
 
 #[tauri::command]
 pub(crate) async fn transfer_folder(
@@ -25,17 +26,25 @@ pub(crate) async fn transfer_folder(
 
     // フォルダ移動した結果の表示更新
     let (index, _) = get_active_tab_index(&label, &state).await?;
-    let (path, mut page) = {
+    let (path, mut page, sort, search_query) = {
         let explorers = state.explorers.lock().await;
         let explorer_state = explorers.iter().find(|w| w.label == label).unwrap();
         (
             explorer_state.tabs[index].path.clone().unwrap_or_default(),
             explorer_state.tabs[index].page,
+            explorer_state.tabs[index].sort.clone(),
+            explorer_state.tabs[index].search_query.clone(),
         )
     };
 
-    let (thumbnails, total_pages) =
-        explore_path_with_count(&path, page, state.thumbnail_cache.clone()).await?;
+    let (thumbnails, total_pages) = explore_path_with_count(
+        &path,
+        page,
+        state.thumbnail_cache.clone(),
+        &sort,
+        search_query.as_deref(),
+    )
+    .await?;
     if page > total_pages {
         page = total_pages;
     }
@@ -149,9 +158,30 @@ pub(crate) async fn change_explorer_path(
     state: State<'_, AppState>,
     app: AppHandle,
 ) -> Result<(), String> {
+    // Get sort/search from current tab state
+    let (sort, search_query) = {
+        let explorers = state.explorers.lock().await;
+        let explorer_state = explorers
+            .iter()
+            .find(|w| w.label == label)
+            .ok_or_else(|| "explorer not found".to_string())?;
+        let tab = explorer_state
+            .tabs
+            .iter()
+            .find(|t| t.key == key)
+            .ok_or_else(|| "tab not found".to_string())?;
+        (tab.sort.clone(), tab.search_query.clone())
+    };
+
     // 1. ロック外でI/O実行
-    let (thumbnails, total_pages) =
-        explore_path_with_count(&path, 1, state.thumbnail_cache.clone()).await?;
+    let (thumbnails, total_pages) = explore_path_with_count(
+        &path,
+        1,
+        state.thumbnail_cache.clone(),
+        &sort,
+        search_query.as_deref(),
+    )
+    .await?;
 
     // 2. ロック取得して状態更新のみ
     let tab_state = {
@@ -214,14 +244,24 @@ pub(crate) async fn change_explorer_page(
     app: AppHandle,
 ) -> Result<(), String> {
     let index = get_tab_index_by_key(&label, &key, &state).await?;
-    let path = {
+    let (path, sort, search_query) = {
         let explorers = state.explorers.lock().await;
         let explorer_state = explorers.iter().find(|w| w.label == label).unwrap();
-        explorer_state.tabs[index].path.clone().unwrap_or_default()
+        (
+            explorer_state.tabs[index].path.clone().unwrap_or_default(),
+            explorer_state.tabs[index].sort.clone(),
+            explorer_state.tabs[index].search_query.clone(),
+        )
     };
 
-    let (thumbnails, total_pages) =
-        explore_path_with_count(&path, page, state.thumbnail_cache.clone()).await?;
+    let (thumbnails, total_pages) = explore_path_with_count(
+        &path,
+        page,
+        state.thumbnail_cache.clone(),
+        &sort,
+        search_query.as_deref(),
+    )
+    .await?;
     update_tab_and_emit(&label, index, page, thumbnails, total_pages, &state, &app).await?;
     Ok(())
 }
@@ -246,17 +286,25 @@ pub(crate) async fn move_explorer_forward(
     app: AppHandle,
 ) -> Result<(), String> {
     let (index, _) = get_active_tab_index(&label, &state).await?;
-    let (path, page) = {
+    let (path, page, sort, search_query) = {
         let explorers = state.explorers.lock().await;
         let explorer_state = explorers.iter().find(|w| w.label == label).unwrap();
         (
             explorer_state.tabs[index].path.clone().unwrap_or_default(),
             explorer_state.tabs[index].page + 1,
+            explorer_state.tabs[index].sort.clone(),
+            explorer_state.tabs[index].search_query.clone(),
         )
     };
 
-    let (thumbnails, total_pages) =
-        explore_path_with_count(&path, page, state.thumbnail_cache.clone()).await?;
+    let (thumbnails, total_pages) = explore_path_with_count(
+        &path,
+        page,
+        state.thumbnail_cache.clone(),
+        &sort,
+        search_query.as_deref(),
+    )
+    .await?;
     if page > total_pages {
         // 範囲外の場合は現在のページ状態をemitしてローディングを解除
         let tab_state = {
@@ -280,12 +328,14 @@ pub(crate) async fn move_explorer_backward(
     app: AppHandle,
 ) -> Result<(), String> {
     let (index, _) = get_active_tab_index(&label, &state).await?;
-    let (path, page) = {
+    let (path, page, sort, search_query) = {
         let explorers = state.explorers.lock().await;
         let explorer_state = explorers.iter().find(|w| w.label == label).unwrap();
         (
             explorer_state.tabs[index].path.clone().unwrap_or_default(),
             explorer_state.tabs[index].page.saturating_sub(1),
+            explorer_state.tabs[index].sort.clone(),
+            explorer_state.tabs[index].search_query.clone(),
         )
     };
 
@@ -301,8 +351,14 @@ pub(crate) async fn move_explorer_backward(
         return Ok(());
     }
 
-    let (thumbnails, total_pages) =
-        explore_path_with_count(&path, page, state.thumbnail_cache.clone()).await?;
+    let (thumbnails, total_pages) = explore_path_with_count(
+        &path,
+        page,
+        state.thumbnail_cache.clone(),
+        &sort,
+        search_query.as_deref(),
+    )
+    .await?;
     update_tab_and_emit(&label, index, page, thumbnails, total_pages, &state, &app).await?;
     Ok(())
 }
@@ -314,16 +370,33 @@ pub(crate) async fn move_explorer_to_end(
     app: AppHandle,
 ) -> Result<(), String> {
     let (index, _) = get_active_tab_index(&label, &state).await?;
-    let path = {
+    let (path, sort, search_query) = {
         let explorers = state.explorers.lock().await;
         let explorer_state = explorers.iter().find(|w| w.label == label).unwrap();
-        explorer_state.tabs[index].path.clone().unwrap_or_default()
+        (
+            explorer_state.tabs[index].path.clone().unwrap_or_default(),
+            explorer_state.tabs[index].sort.clone(),
+            explorer_state.tabs[index].search_query.clone(),
+        )
     };
 
-    let (_, total_pages) = explore_path_with_count(&path, 1, state.thumbnail_cache.clone()).await?;
+    let (_, total_pages) = explore_path_with_count(
+        &path,
+        1,
+        state.thumbnail_cache.clone(),
+        &sort,
+        search_query.as_deref(),
+    )
+    .await?;
     let page = total_pages;
-    let (thumbnails, _) =
-        explore_path_with_count(&path, page, state.thumbnail_cache.clone()).await?;
+    let (thumbnails, _) = explore_path_with_count(
+        &path,
+        page,
+        state.thumbnail_cache.clone(),
+        &sort,
+        search_query.as_deref(),
+    )
+    .await?;
 
     update_tab_and_emit(&label, index, page, thumbnails, total_pages, &state, &app).await?;
     Ok(())
@@ -336,15 +409,25 @@ pub(crate) async fn move_explorer_to_start(
     app: AppHandle,
 ) -> Result<(), String> {
     let (index, _) = get_active_tab_index(&label, &state).await?;
-    let path = {
+    let (path, sort, search_query) = {
         let explorers = state.explorers.lock().await;
         let explorer_state = explorers.iter().find(|w| w.label == label).unwrap();
-        explorer_state.tabs[index].path.clone().unwrap_or_default()
+        (
+            explorer_state.tabs[index].path.clone().unwrap_or_default(),
+            explorer_state.tabs[index].sort.clone(),
+            explorer_state.tabs[index].search_query.clone(),
+        )
     };
 
     let page = 1;
-    let (thumbnails, total_pages) =
-        explore_path_with_count(&path, page, state.thumbnail_cache.clone()).await?;
+    let (thumbnails, total_pages) = explore_path_with_count(
+        &path,
+        page,
+        state.thumbnail_cache.clone(),
+        &sort,
+        search_query.as_deref(),
+    )
+    .await?;
     update_tab_and_emit(&label, index, page, thumbnails, total_pages, &state, &app).await?;
     Ok(())
 }
@@ -383,17 +466,119 @@ pub(crate) async fn refresh_explorer_tab(
     app: AppHandle,
 ) -> Result<(), String> {
     let index = get_tab_index_by_key(&label, &key, &state).await?;
-    let (path, page) = {
+    let (path, page, sort, search_query) = {
         let explorers = state.explorers.lock().await;
         let explorer_state = explorers.iter().find(|w| w.label == label).unwrap();
         (
             explorer_state.tabs[index].path.clone().unwrap_or_default(),
             explorer_state.tabs[index].page,
+            explorer_state.tabs[index].sort.clone(),
+            explorer_state.tabs[index].search_query.clone(),
         )
     };
 
-    let (thumbnails, total_pages) =
-        explore_path_with_count(&path, page, state.thumbnail_cache.clone()).await?;
+    let (thumbnails, total_pages) = explore_path_with_count(
+        &path,
+        page,
+        state.thumbnail_cache.clone(),
+        &sort,
+        search_query.as_deref(),
+    )
+    .await?;
     update_tab_and_emit(&label, index, page, thumbnails, total_pages, &state, &app).await?;
+    Ok(())
+}
+
+/// ソート設定を変更する
+#[tauri::command]
+pub(crate) async fn change_explorer_sort(
+    label: String,
+    key: String,
+    sort: SortConfig,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    let index = get_tab_index_by_key(&label, &key, &state).await?;
+    let (path, search_query) = {
+        let mut explorers = state.explorers.lock().await;
+        let explorer_state = explorers
+            .iter_mut()
+            .find(|w| w.label == label)
+            .ok_or_else(|| "explorer not found".to_string())?;
+        explorer_state.tabs[index].sort = sort.clone();
+        (
+            explorer_state.tabs[index].path.clone(),
+            explorer_state.tabs[index].search_query.clone(),
+        )
+    };
+
+    // パスがない場合（デバイス一覧）はソートしない
+    if let Some(path) = path {
+        let (thumbnails, total_pages) = explore_path_with_count(
+            &path,
+            1,
+            state.thumbnail_cache.clone(),
+            &sort,
+            search_query.as_deref(),
+        )
+        .await?;
+        update_tab_and_emit(&label, index, 1, thumbnails, total_pages, &state, &app).await?;
+    } else {
+        // デバイス一覧の場合は状態のみ更新
+        let tab_state = {
+            let explorers = state.explorers.lock().await;
+            let explorer_state = explorers.iter().find(|w| w.label == label).unwrap();
+            explorer_state.tabs[index].clone()
+        };
+        app.emit_to(&label, "explorer-tab-state-changed", &tab_state)
+            .map_err(|_| "failed to emit explorer state".to_string())?;
+    }
+    Ok(())
+}
+
+/// 検索クエリを変更する
+#[tauri::command]
+pub(crate) async fn change_explorer_search(
+    label: String,
+    key: String,
+    query: Option<String>,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    let index = get_tab_index_by_key(&label, &key, &state).await?;
+    let (path, sort) = {
+        let mut explorers = state.explorers.lock().await;
+        let explorer_state = explorers
+            .iter_mut()
+            .find(|w| w.label == label)
+            .ok_or_else(|| "explorer not found".to_string())?;
+        explorer_state.tabs[index].search_query = query.clone();
+        (
+            explorer_state.tabs[index].path.clone(),
+            explorer_state.tabs[index].sort.clone(),
+        )
+    };
+
+    // パスがない場合（デバイス一覧）は検索しない
+    if let Some(path) = path {
+        let (thumbnails, total_pages) = explore_path_with_count(
+            &path,
+            1,
+            state.thumbnail_cache.clone(),
+            &sort,
+            query.as_deref(),
+        )
+        .await?;
+        update_tab_and_emit(&label, index, 1, thumbnails, total_pages, &state, &app).await?;
+    } else {
+        // デバイス一覧の場合は状態のみ更新
+        let tab_state = {
+            let explorers = state.explorers.lock().await;
+            let explorer_state = explorers.iter().find(|w| w.label == label).unwrap();
+            explorer_state.tabs[index].clone()
+        };
+        app.emit_to(&label, "explorer-tab-state-changed", &tab_state)
+            .map_err(|_| "failed to emit explorer state".to_string())?;
+    }
     Ok(())
 }
