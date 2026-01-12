@@ -4,7 +4,9 @@ import { getMatches } from '@tauri-apps/plugin-cli';
 import { UnlistenFn } from '@tauri-apps/api/event';
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { invoke } from '@tauri-apps/api/core';
-import { createSignal, onCleanup } from 'solid-js';
+import { createSignal, onCleanup, onMount } from 'solid-js';
+import { check } from '@tauri-apps/plugin-updater';
+import { relaunch } from '@tauri-apps/plugin-process';
 const appWindow = getCurrentWebviewWindow();
 
 type ViewerState = {
@@ -18,6 +20,24 @@ const Viewer = () => {
   const [activeKey, setActiveKey] = createSignal<string>();
   const [panes, setPanes] = createSignal<TabState[]>([]);
   let unListenRef: UnlistenFn | undefined = undefined;
+
+  // Check for updates on mount (only on the first viewer window)
+  onMount(async () => {
+    if (appWindow.label !== 'viewer-0') return;
+
+    try {
+      const update = await check();
+      if (update) {
+        console.log(`Update available: ${update.version}`);
+        // Download and install the update
+        await update.downloadAndInstall();
+        // Relaunch the app to apply the update
+        await relaunch();
+      }
+    } catch (error) {
+      console.error('Failed to check for updates:', error);
+    }
+  });
 
   const onChange = (newActiveKey: string) => {
     invoke('change_active_viewer_tab', {

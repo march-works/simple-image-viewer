@@ -204,6 +204,7 @@ pub fn create_viewer() -> Builder<Wry> {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(move |app| {
             // Setup menu
             let quit_item = MenuItemBuilder::with_id("quit", "Quit").build(app)?;
