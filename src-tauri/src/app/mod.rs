@@ -25,13 +25,14 @@ use crate::{
             change_active_viewer, change_active_viewer_tab, change_viewing,
             close_viewer_tabs_by_directory, get_active_viewer_directory, get_filenames_inner_zip,
             move_backward, move_forward, open_file_image, open_image_dialog, open_new_viewer,
-            open_new_viewer_tab, read_image_in_zip, refresh_viewer_tab_tree, remove_viewer_tab,
-            request_restore_viewer_state, request_restore_viewer_tab_state,
+            open_new_viewer_tab, read_image_in_zip, record_folder_view, refresh_viewer_tab_tree,
+            remove_viewer_tab, request_restore_viewer_state, request_restore_viewer_tab_state,
             subscribe_dir_notification, unsubscribe_dir_notification,
         },
     },
     service::{
         app_state::{ActiveViewer, AppState},
+        database::Database,
         explorer_state::{remove_explorer_state, ExplorerState},
         viewer_state::{add_viewer_state, add_viewer_tab_state, remove_viewer_state, ViewerState},
     },
@@ -92,12 +93,18 @@ fn get_explorer_title() -> &'static str {
 
 pub fn create_viewer() -> Builder<Wry> {
     let save_dir = dirs::data_dir().unwrap_or_default();
-    let save_path = save_dir.join(get_app_dir_name()).join("state.json");
+    let app_dir = save_dir.join(get_app_dir_name());
+    let save_path = app_dir.join("state.json");
     let saved_state = if let Ok(data) = std::fs::read_to_string(save_path.clone()) {
         serde_json::from_str::<SavedState>(&data).unwrap_or_default()
     } else {
         SavedState::default()
     };
+
+    // Initialize SQLite database (Phase 2)
+    let db_path = app_dir.join("data.db");
+    let db = Database::init(&db_path).expect("Failed to initialize database");
+
     let app_state = AppState {
         count: Mutex::new(saved_state.count),
         active: Mutex::new(saved_state.active),
@@ -107,6 +114,7 @@ pub fn create_viewer() -> Builder<Wry> {
         thumbnail_cache: std::sync::Arc::new(tokio::sync::RwLock::new(
             std::collections::HashMap::new(),
         )),
+        db: std::sync::Arc::new(db),
     };
     let viewers_to_restore = saved_state.viewers.clone();
     let explorers_to_restore = saved_state.explorers.clone();
@@ -284,5 +292,6 @@ pub fn create_viewer() -> Builder<Wry> {
             refresh_viewer_tab_tree,
             get_active_viewer_directory,
             close_viewer_tabs_by_directory,
+            record_folder_view,
         ])
 }

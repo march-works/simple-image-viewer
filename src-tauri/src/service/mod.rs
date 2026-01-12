@@ -1,4 +1,5 @@
 pub mod app_state;
+pub mod database;
 pub mod explorer_state;
 pub mod explorer_types;
 pub mod types;
