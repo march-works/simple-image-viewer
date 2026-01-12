@@ -15,6 +15,32 @@ use crate::utils::watcher_utils::{
     create_viewer_watcher_callback, subscribe_directory, unsubscribe_directory,
 };
 
+/// Viewer状態変更時に全Explorerにアクティブディレクトリを通知する共通関数
+async fn notify_active_directory_to_explorers(
+    viewer_state: &crate::service::app_state::ViewerState,
+    state: &State<'_, AppState>,
+    app: &AppHandle,
+) -> Result<(), String> {
+    let active_dir = viewer_state.active.as_ref().and_then(|active_tab| {
+        viewer_state
+            .tabs
+            .iter()
+            .find(|tab| tab.key == active_tab.key)
+            .map(|tab| normalize_path(&tab.path))
+    });
+
+    let explorers = state.explorers.lock().await;
+    for explorer in explorers.iter() {
+        let _ = app.emit_to(
+            &explorer.label,
+            "active-viewer-directory-changed",
+            active_dir.clone(),
+        );
+    }
+
+    Ok(())
+}
+
 /// ディレクトリ監視を開始する
 /// watcherはAppStateで管理し、同じパスへの監視は参照カウントで共有する
 #[tauri::command]
@@ -137,27 +163,12 @@ pub(crate) async fn change_active_viewer<'a>(
     drop(label);
 
     let viewers = state.viewers.lock().await;
-    let active_dir = viewers
+    let viewer_state = viewers
         .iter()
         .find(|v| v.label == active_label)
-        .and_then(|viewer| {
-            viewer.active.as_ref().and_then(|active_tab| {
-                viewer
-                    .tabs
-                    .iter()
-                    .find(|tab| tab.key == active_tab.key)
-                    .map(|tab| normalize_path(&tab.path))
-            })
-        });
+        .ok_or_else(|| "active viewer not found".to_string())?;
 
-    let explorers = state.explorers.lock().await;
-    for explorer in explorers.iter() {
-        let _ = app.emit_to(
-            &explorer.label,
-            "active-viewer-directory-changed",
-            active_dir.clone(),
-        );
-    }
+    notify_active_directory_to_explorers(viewer_state, &state, &app).await?;
 
     Ok(())
 }
@@ -200,6 +211,10 @@ pub(crate) async fn remove_viewer_tab<'a>(
     let viewer_state = remove_viewer_tab_state(&label, &key, &state).await?;
     app.emit_to(&label, "viewer-state-changed", viewer_state.clone())
         .map_err(|_| "failed to emit viewer state".to_string())?;
+
+    // タブを閉じた後の新しいアクティブディレクトリを全Explorerに通知
+    notify_active_directory_to_explorers(&viewer_state, &state, &app).await?;
+
     Ok(())
 }
 
@@ -220,20 +235,7 @@ pub(crate) async fn change_active_viewer_tab<'a>(
         .map_err(|_| "failed to emit viewer state".to_string())?;
 
     // アクティブなタブのディレクトリを全Explorerに通知
-    let active_dir = viewer_state
-        .tabs
-        .iter()
-        .find(|tab| tab.key == key)
-        .map(|tab| normalize_path(&tab.path));
-
-    let explorers = state.explorers.lock().await;
-    for explorer in explorers.iter() {
-        let _ = app.emit_to(
-            &explorer.label,
-            "active-viewer-directory-changed",
-            active_dir.clone(),
-        );
-    }
+    notify_active_directory_to_explorers(viewer_state, &state, &app).await?;
 
     Ok(())
 }
