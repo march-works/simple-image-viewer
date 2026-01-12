@@ -1,7 +1,8 @@
-import { For } from 'solid-js';
+import { For, Show } from 'solid-js';
 import type { Component } from 'solid-js';
 import { FaSolidFolderOpen } from 'solid-icons/fa';
 import { RiDocumentFolderTransferFill } from 'solid-icons/ri';
+import { FaSolidWandMagicSparkles } from 'solid-icons/fa';
 import {
   SortConfig,
   getSortOptionIndex,
@@ -12,10 +13,12 @@ type Props = {
   transferPath: string | undefined;
   sortConfig: SortConfig;
   searchInput: string;
+  isRebuildingRecommendations: boolean;
   onResetTab: () => void;
   onSelectTransferPath: () => void;
   onSortChange: (index: number) => void;
   onSearchInput: (value: string) => void;
+  onRebuildRecommendations: () => void;
 };
 
 export const ExplorerToolbar: Component<Props> = (props) => {
@@ -35,6 +38,24 @@ export const ExplorerToolbar: Component<Props> = (props) => {
         <span class="text-xs">
           {props.transferPath ? '転送先を変更する' : '転送先を設定する'}
         </span>
+      </div>
+      <div
+        class={`p-2 flex flex-row h-8 shrink-0 items-center justify-center rounded-full border-2 border-neutral-500 bg-neutral-900 transition-colors ${
+          props.isRebuildingRecommendations
+            ? 'text-yellow-400 cursor-not-allowed'
+            : 'text-neutral-400 hover:bg-neutral-700 hover:text-neutral-300 cursor-pointer'
+        }`}
+        onClick={() =>
+          !props.isRebuildingRecommendations && props.onRebuildRecommendations()
+        }
+        title="おすすめを再構築"
+      >
+        <FaSolidWandMagicSparkles
+          class={`h-4 w-4 ${props.isRebuildingRecommendations ? 'animate-pulse' : ''}`}
+        />
+        <Show when={props.isRebuildingRecommendations}>
+          <span class="ml-1 text-xs">処理中...</span>
+        </Show>
       </div>
       <div class="flex-1" />
       <input

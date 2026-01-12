@@ -14,6 +14,10 @@ import type { TabState } from '../types';
 
 const appWindow = getCurrentWebviewWindow();
 
+// リコメンド再構築状態（グローバル、全タブで共有）
+const [isRebuildingRecommendations, setIsRebuildingRecommendations] =
+  createSignal<boolean>(false);
+
 export const useExplorerTab = (tabKey: string, isActiveTab: () => boolean) => {
   const [transferPath, setTransferPath] = createSignal<string>();
   const [folders, setFolders] = createSignal<Thumbnail[]>([]);
@@ -28,6 +32,9 @@ export const useExplorerTab = (tabKey: string, isActiveTab: () => boolean) => {
 
   let unListenRef: UnlistenFn | undefined = undefined;
   let activeViewerDirListenRef: UnlistenFn | undefined = undefined;
+  let rebuildStartedListenRef: UnlistenFn | undefined = undefined;
+  let rebuildCompletedListenRef: UnlistenFn | undefined = undefined;
+  let rebuildErrorListenRef: UnlistenFn | undefined = undefined;
 
   // デバウンスされた検索実行関数
   const debouncedSearch = debounce((value: string) => {
@@ -84,6 +91,29 @@ export const useExplorerTab = (tabKey: string, isActiveTab: () => boolean) => {
       },
     );
 
+    // リコメンド再構築イベントリスナー
+    rebuildStartedListenRef = await appWindow.listen(
+      'rebuild-recommendations-started',
+      () => {
+        setIsRebuildingRecommendations(true);
+      },
+    );
+
+    rebuildCompletedListenRef = await appWindow.listen(
+      'rebuild-recommendations-completed',
+      () => {
+        setIsRebuildingRecommendations(false);
+      },
+    );
+
+    rebuildErrorListenRef = await appWindow.listen(
+      'rebuild-recommendations-error',
+      (event) => {
+        console.error('Rebuild recommendations error:', event.payload);
+        setIsRebuildingRecommendations(false);
+      },
+    );
+
     // 初回読み込み
     invoke('request_restore_explorer_tab_state', {
       label: appWindow.label,
@@ -92,6 +122,14 @@ export const useExplorerTab = (tabKey: string, isActiveTab: () => boolean) => {
 
     // 初回のアクティブディレクトリを取得
     updateActiveViewerDirectory();
+
+    // 初回のリコメンド再構築状態を取得
+    try {
+      const rebuilding = await invoke<boolean>('is_rebuilding_recommendations');
+      setIsRebuildingRecommendations(rebuilding);
+    } catch {
+      // 無視
+    }
   });
 
   // ナビゲーション
@@ -181,6 +219,16 @@ export const useExplorerTab = (tabKey: string, isActiveTab: () => boolean) => {
     debouncedSearch(value);
   };
 
+  // リコメンド再構築
+  const rebuildRecommendations = async () => {
+    if (isRebuildingRecommendations()) return;
+    try {
+      await invoke('rebuild_recommendations');
+    } catch (error) {
+      console.error('Failed to rebuild recommendations:', error);
+    }
+  };
+
   // キーボード・マウスナビゲーション
   const handleOnKeyDown = (event: KeyboardEvent) => {
     if (!isActiveTab()) return;
@@ -210,6 +258,9 @@ export const useExplorerTab = (tabKey: string, isActiveTab: () => boolean) => {
     debouncedSearch.clear();
     unListenRef?.();
     activeViewerDirListenRef?.();
+    rebuildStartedListenRef?.();
+    rebuildCompletedListenRef?.();
+    rebuildErrorListenRef?.();
   });
 
   return {
@@ -221,6 +272,7 @@ export const useExplorerTab = (tabKey: string, isActiveTab: () => boolean) => {
     activeViewerDir,
     sortConfig,
     searchInput,
+    isRebuildingRecommendations,
     // アクション
     selectTransferPath,
     onFolderClick,
@@ -234,5 +286,6 @@ export const useExplorerTab = (tabKey: string, isActiveTab: () => boolean) => {
     moveLast,
     handleSortChange,
     handleSearchInput,
+    rebuildRecommendations,
   };
 };

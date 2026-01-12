@@ -33,6 +33,7 @@ impl Database {
 
     /// スキーマのマイグレーションを実行
     fn migrate(conn: &Connection) -> Result<()> {
+        // Phase 2: 基本テーブル
         conn.execute_batch(
             r#"
             CREATE TABLE IF NOT EXISTS folder_records (
@@ -46,6 +47,28 @@ impl Database {
             CREATE INDEX IF NOT EXISTS idx_last_viewed ON folder_records(last_viewed_at DESC);
             "#,
         )?;
+
+        // Phase 4: 埋め込みカラム追加
+        // SQLite では ALTER TABLE ADD COLUMN IF NOT EXISTS がないので、
+        // カラムが存在しない場合のみ追加する
+        let has_image_embedding: bool = conn
+            .query_row(
+                "SELECT COUNT(*) FROM pragma_table_info('folder_records') WHERE name='image_embedding'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap_or(0) > 0;
+
+        if !has_image_embedding {
+            conn.execute_batch(
+                r#"
+                ALTER TABLE folder_records ADD COLUMN image_embedding BLOB;
+                ALTER TABLE folder_records ADD COLUMN path_embedding BLOB;
+                ALTER TABLE folder_records ADD COLUMN embedding_version INTEGER DEFAULT 0;
+                "#,
+            )?;
+        }
+
         Ok(())
     }
 
@@ -148,7 +171,8 @@ impl Database {
         let result = conn
             .query_row(
                 r#"
-                SELECT path, thumbnail_blob, thumbnail_hash, last_viewed_at, view_count, created_at
+                SELECT path, thumbnail_blob, thumbnail_hash, last_viewed_at, view_count, created_at,
+                       image_embedding, path_embedding, embedding_version
                 FROM folder_records WHERE path = ?1
                 "#,
                 [folder_path],
@@ -160,6 +184,9 @@ impl Database {
                         last_viewed_at: row.get(3)?,
                         view_count: row.get(4)?,
                         created_at: row.get(5)?,
+                        image_embedding: row.get(6)?,
+                        path_embedding: row.get(7)?,
+                        embedding_version: row.get(8)?,
                     })
                 },
             )
@@ -182,7 +209,8 @@ impl Database {
 
         let mut stmt = conn.prepare(
             r#"
-            SELECT path, thumbnail_blob, thumbnail_hash, last_viewed_at, view_count, created_at
+            SELECT path, thumbnail_blob, thumbnail_hash, last_viewed_at, view_count, created_at,
+                   image_embedding, path_embedding, embedding_version
             FROM folder_records
             WHERE path LIKE ?1
             "#,
@@ -197,6 +225,9 @@ impl Database {
                     last_viewed_at: row.get(3)?,
                     view_count: row.get(4)?,
                     created_at: row.get(5)?,
+                    image_embedding: row.get(6)?,
+                    path_embedding: row.get(7)?,
+                    embedding_version: row.get(8)?,
                 })
             })?
             .filter_map(|r| r.ok())
@@ -212,6 +243,143 @@ impl Database {
         conn.execute("DELETE FROM folder_records WHERE path = ?1", [folder_path])?;
         Ok(())
     }
+
+    /// 埋め込みベクトルを更新する
+    pub fn update_embeddings(
+        &self,
+        folder_path: &str,
+        image_embedding: &[u8],
+        path_embedding: &[u8],
+        version: i32,
+    ) -> Result<()> {
+        let conn = self.conn.lock().map_err(|e| anyhow::anyhow!("{}", e))?;
+
+        conn.execute(
+            r#"
+            UPDATE folder_records
+            SET image_embedding = ?2, path_embedding = ?3, embedding_version = ?4
+            WHERE path = ?1
+            "#,
+            rusqlite::params![folder_path, image_embedding, path_embedding, version],
+        )?;
+
+        Ok(())
+    }
+
+    /// サムネイルがあるが埋め込みがない、または古いバージョンのレコードを取得
+    pub fn get_records_needing_embedding(&self, current_version: i32) -> Result<Vec<FolderRecord>> {
+        let conn = self.conn.lock().map_err(|e| anyhow::anyhow!("{}", e))?;
+
+        let mut stmt = conn.prepare(
+            r#"
+            SELECT path, thumbnail_blob, thumbnail_hash, last_viewed_at, view_count, created_at,
+                   image_embedding, path_embedding, embedding_version
+            FROM folder_records
+            WHERE thumbnail_blob IS NOT NULL
+              AND (image_embedding IS NULL OR embedding_version < ?1)
+            "#,
+        )?;
+
+        let records = stmt
+            .query_map([current_version], |row| {
+                Ok(FolderRecord {
+                    path: row.get(0)?,
+                    thumbnail_blob: row.get(1)?,
+                    thumbnail_hash: row.get(2)?,
+                    last_viewed_at: row.get(3)?,
+                    view_count: row.get(4)?,
+                    created_at: row.get(5)?,
+                    image_embedding: row.get(6)?,
+                    path_embedding: row.get(7)?,
+                    embedding_version: row.get(8)?,
+                })
+            })?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        Ok(records)
+    }
+
+    /// 直近閲覧した N 件のフォルダレコード（埋め込み付き）を取得
+    pub fn get_recent_viewed_records_with_embeddings(
+        &self,
+        limit: usize,
+    ) -> Result<Vec<FolderRecord>> {
+        let conn = self.conn.lock().map_err(|e| anyhow::anyhow!("{}", e))?;
+
+        let mut stmt = conn.prepare(
+            r#"
+            SELECT path, thumbnail_blob, thumbnail_hash, last_viewed_at, view_count, created_at,
+                   image_embedding, path_embedding, embedding_version
+            FROM folder_records
+            WHERE last_viewed_at IS NOT NULL
+              AND image_embedding IS NOT NULL
+            ORDER BY last_viewed_at DESC
+            LIMIT ?1
+            "#,
+        )?;
+
+        let records = stmt
+            .query_map([limit], |row| {
+                Ok(FolderRecord {
+                    path: row.get(0)?,
+                    thumbnail_blob: row.get(1)?,
+                    thumbnail_hash: row.get(2)?,
+                    last_viewed_at: row.get(3)?,
+                    view_count: row.get(4)?,
+                    created_at: row.get(5)?,
+                    image_embedding: row.get(6)?,
+                    path_embedding: row.get(7)?,
+                    embedding_version: row.get(8)?,
+                })
+            })?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        Ok(records)
+    }
+
+    /// 指定パスのフォルダの埋め込みスコアを取得（リコメンド用）
+    pub fn get_folder_records_by_paths(&self, paths: &[String]) -> Result<Vec<FolderRecord>> {
+        if paths.is_empty() {
+            return Ok(vec![]);
+        }
+
+        let conn = self.conn.lock().map_err(|e| anyhow::anyhow!("{}", e))?;
+
+        // SQLite の IN 句用にプレースホルダを生成
+        let placeholders: Vec<String> = (1..=paths.len()).map(|i| format!("?{}", i)).collect();
+        let query = format!(
+            r#"
+            SELECT path, thumbnail_blob, thumbnail_hash, last_viewed_at, view_count, created_at,
+                   image_embedding, path_embedding, embedding_version
+            FROM folder_records
+            WHERE path IN ({})
+            "#,
+            placeholders.join(", ")
+        );
+
+        let mut stmt = conn.prepare(&query)?;
+
+        let records = stmt
+            .query_map(rusqlite::params_from_iter(paths.iter()), |row| {
+                Ok(FolderRecord {
+                    path: row.get(0)?,
+                    thumbnail_blob: row.get(1)?,
+                    thumbnail_hash: row.get(2)?,
+                    last_viewed_at: row.get(3)?,
+                    view_count: row.get(4)?,
+                    created_at: row.get(5)?,
+                    image_embedding: row.get(6)?,
+                    path_embedding: row.get(7)?,
+                    embedding_version: row.get(8)?,
+                })
+            })?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        Ok(records)
+    }
 }
 
 /// フォルダレコード
@@ -223,4 +391,7 @@ pub struct FolderRecord {
     pub last_viewed_at: Option<i64>,
     pub view_count: i64,
     pub created_at: i64,
+    pub image_embedding: Option<Vec<u8>>,
+    pub path_embedding: Option<Vec<u8>>,
+    pub embedding_version: Option<i32>,
 }

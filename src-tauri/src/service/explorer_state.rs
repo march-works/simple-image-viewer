@@ -385,6 +385,11 @@ pub(crate) async fn explore_path_with_count(
         (SortField::DateCreated, SortOrder::Desc) => {
             entries_with_meta.sort_by(|a, b| b.2.cmp(&a.2));
         }
+        // リコメンドソートはフロントエンドで処理するため、
+        // ここではデフォルトの更新日時降順でソート
+        (SortField::Recommendation, _) => {
+            entries_with_meta.sort_by(|a, b| b.1.cmp(&a.1));
+        }
     }
 
     // 4. 総ページ数を計算

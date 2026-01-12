@@ -31,7 +31,10 @@
       "providerShortName": null,
       "signingIdentity": null
     },
-    "resources": [],
+    "resources": [
+      "resources/vision_model.onnx",
+      "resources/text_model.onnx"
+    ],
     "shortDescription": "",
     "linux": {
       "deb": {

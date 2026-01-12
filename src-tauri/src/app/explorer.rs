@@ -542,3 +542,202 @@ pub(crate) async fn change_explorer_search(
     }
     Ok(())
 }
+
+/// リコメンドを再構築する（バックグラウンド処理）
+#[tauri::command]
+pub(crate) async fn rebuild_recommendations(
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<(), String> {
+    use crate::service::embedding_service::{embedding_to_bytes, EMBEDDING_VERSION};
+
+    let embedding_service = state
+        .embedding_service
+        .as_ref()
+        .ok_or_else(|| "Embedding service not available".to_string())?;
+
+    // 既に処理中の場合はエラー
+    if embedding_service.is_processing().await {
+        return Err("Recommendation rebuild already in progress".to_string());
+    }
+
+    // 処理開始
+    embedding_service.set_processing(true).await;
+
+    // 処理開始を通知
+    let _ = app.emit("rebuild-recommendations-started", ());
+
+    // バックグラウンドで処理
+    let db = state.db.clone();
+    let service = embedding_service.clone();
+    let app_handle = app.clone();
+
+    tokio::spawn(async move {
+        let result = async {
+            // 埋め込みが必要なレコードを取得
+            let records = db
+                .get_records_needing_embedding(EMBEDDING_VERSION)
+                .map_err(|e| e.to_string())?;
+
+            let total = records.len();
+            let mut processed = 0;
+
+            for record in records {
+                if let Some(thumbnail_blob) = &record.thumbnail_blob {
+                    // 画像埋め込みを生成
+                    let image_embedding = service
+                        .generate_image_embedding(thumbnail_blob)
+                        .await
+                        .map_err(|e| e.to_string())?;
+
+                    // パス埋め込みを生成（フォルダ名を使用）
+                    let folder_name = std::path::Path::new(&record.path)
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .unwrap_or(&record.path);
+                    let path_embedding = service
+                        .generate_text_embedding(folder_name)
+                        .await
+                        .map_err(|e| e.to_string())?;
+
+                    // DB に保存
+                    db.update_embeddings(
+                        &record.path,
+                        &embedding_to_bytes(&image_embedding),
+                        &embedding_to_bytes(&path_embedding),
+                        EMBEDDING_VERSION,
+                    )
+                    .map_err(|e| e.to_string())?;
+
+                    processed += 1;
+
+                    // 進捗を通知（10件ごと）
+                    if processed % 10 == 0 {
+                        let _ = app_handle.emit(
+                            "rebuild-recommendations-progress",
+                            serde_json::json!({
+                                "processed": processed,
+                                "total": total
+                            }),
+                        );
+                    }
+                }
+            }
+
+            Ok::<_, String>(processed)
+        }
+        .await;
+
+        // 処理完了
+        service.set_processing(false).await;
+
+        match result {
+            Ok(count) => {
+                let _ = app_handle.emit(
+                    "rebuild-recommendations-completed",
+                    serde_json::json!({ "processed": count }),
+                );
+            }
+            Err(e) => {
+                let _ = app_handle.emit("rebuild-recommendations-error", e);
+            }
+        }
+    });
+
+    Ok(())
+}
+
+/// リコメンド再構築が処理中かどうかを取得
+#[tauri::command]
+pub(crate) async fn is_rebuilding_recommendations(
+    state: State<'_, AppState>,
+) -> Result<bool, String> {
+    match &state.embedding_service {
+        Some(service) => Ok(service.is_processing().await),
+        None => Ok(false),
+    }
+}
+
+/// 指定フォルダ群のリコメンドスコアを取得
+#[tauri::command]
+pub(crate) async fn get_recommendation_scores(
+    folder_paths: Vec<String>,
+    state: State<'_, AppState>,
+) -> Result<std::collections::HashMap<String, f64>, String> {
+    use crate::service::embedding_service::{
+        average_embeddings, cosine_similarity, embedding_from_bytes,
+    };
+
+    const IMAGE_WEIGHT: f64 = 0.8;
+    const PATH_WEIGHT: f64 = 0.2;
+    const RECENT_LIMIT: usize = 20;
+
+    let mut scores = std::collections::HashMap::new();
+
+    // 埋め込みサービスがない場合はすべて 0 スコア
+    if state.embedding_service.is_none() {
+        for path in &folder_paths {
+            scores.insert(path.clone(), 0.0);
+        }
+        return Ok(scores);
+    }
+
+    // 直近閲覧したフォルダの埋め込みを取得
+    let recent_records = state
+        .db
+        .get_recent_viewed_records_with_embeddings(RECENT_LIMIT)
+        .map_err(|e| e.to_string())?;
+
+    if recent_records.is_empty() {
+        // 履歴がない場合はすべて 0 スコア
+        for path in &folder_paths {
+            scores.insert(path.clone(), 0.0);
+        }
+        return Ok(scores);
+    }
+
+    // 履歴の埋め込みを平均
+    let recent_image_embeddings: Vec<Vec<f32>> = recent_records
+        .iter()
+        .filter_map(|r| r.image_embedding.as_ref().map(|e| embedding_from_bytes(e)))
+        .collect();
+    let recent_path_embeddings: Vec<Vec<f32>> = recent_records
+        .iter()
+        .filter_map(|r| r.path_embedding.as_ref().map(|e| embedding_from_bytes(e)))
+        .collect();
+
+    let avg_image_embedding = average_embeddings(&recent_image_embeddings);
+    let avg_path_embedding = average_embeddings(&recent_path_embeddings);
+
+    // 対象フォルダのレコードを取得
+    let target_records = state
+        .db
+        .get_folder_records_by_paths(&folder_paths)
+        .map_err(|e| e.to_string())?;
+
+    // スコアを計算
+    for record in target_records {
+        let mut score = 0.0f64;
+
+        if let Some(image_emb) = &record.image_embedding {
+            let emb = embedding_from_bytes(image_emb);
+            let sim = cosine_similarity(&emb, &avg_image_embedding);
+            score += IMAGE_WEIGHT * sim as f64;
+        }
+
+        if let Some(path_emb) = &record.path_embedding {
+            let emb = embedding_from_bytes(path_emb);
+            let sim = cosine_similarity(&emb, &avg_path_embedding);
+            score += PATH_WEIGHT * sim as f64;
+        }
+
+        scores.insert(record.path.clone(), score);
+    }
+
+    // 埋め込みがないフォルダは 0 スコア
+    for path in &folder_paths {
+        scores.entry(path.clone()).or_insert(0.0);
+    }
+
+    Ok(scores)
+}

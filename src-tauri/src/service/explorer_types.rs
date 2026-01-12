@@ -7,6 +7,8 @@ pub enum SortField {
     #[default]
     DateModified,
     DateCreated,
+    /// リコメンドスコア順（Phase 4）
+    Recommendation,
 }
 
 /// ソート順序

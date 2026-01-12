@@ -14,8 +14,9 @@ use crate::{
         explorer::{
             change_active_explorer_tab, change_explorer_page, change_explorer_path,
             change_explorer_search, change_explorer_sort, change_explorer_transfer_path,
-            move_explorer_backward, move_explorer_forward, move_explorer_to_end,
-            move_explorer_to_start, open_new_explorer, open_new_explorer_tab, refresh_explorer_tab,
+            get_recommendation_scores, is_rebuilding_recommendations, move_explorer_backward,
+            move_explorer_forward, move_explorer_to_end, move_explorer_to_start, open_new_explorer,
+            open_new_explorer_tab, rebuild_recommendations, refresh_explorer_tab,
             remove_explorer_tab, request_restore_explorer_state,
             request_restore_explorer_tab_state, reset_explorer_tab,
             subscribe_explorer_dir_notification, transfer_folder,
@@ -33,6 +34,7 @@ use crate::{
     service::{
         app_state::{ActiveViewer, AppState},
         database::Database,
+        embedding_service::EmbeddingService,
         explorer_state::{remove_explorer_state, ExplorerState},
         viewer_state::{add_viewer_state, add_viewer_tab_state, remove_viewer_state, ViewerState},
     },
@@ -105,6 +107,47 @@ pub fn create_viewer() -> Builder<Wry> {
     let db_path = app_dir.join("data.db");
     let db = Database::init(&db_path).expect("Failed to initialize database");
 
+    // Initialize CLIP embedding service (Phase 4)
+    // モデルファイルが存在する場合のみ初期化
+    let embedding_service = {
+        let resource_dir = app_dir.clone();
+        // 開発時は src-tauri/resources から、本番時は bundled resources から読み込む
+        let vision_path = resource_dir.join("resources").join("vision_model.onnx");
+        let text_path = resource_dir.join("resources").join("text_model.onnx");
+
+        if vision_path.exists() && text_path.exists() {
+            match EmbeddingService::init(&resource_dir.join("resources")) {
+                Ok(service) => {
+                    println!("CLIP embedding service initialized");
+                    Some(std::sync::Arc::new(service))
+                }
+                Err(e) => {
+                    eprintln!("Failed to initialize embedding service: {}", e);
+                    None
+                }
+            }
+        } else {
+            // 開発時: src-tauri/resources から読み込む
+            let dev_resource_dir =
+                std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources");
+            if dev_resource_dir.join("vision_model.onnx").exists() {
+                match EmbeddingService::init(&dev_resource_dir) {
+                    Ok(service) => {
+                        println!("CLIP embedding service initialized (dev mode)");
+                        Some(std::sync::Arc::new(service))
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to initialize embedding service: {}", e);
+                        None
+                    }
+                }
+            } else {
+                println!("CLIP models not found, recommendation feature disabled");
+                None
+            }
+        }
+    };
+
     let app_state = AppState {
         count: Mutex::new(saved_state.count),
         active: Mutex::new(saved_state.active),
@@ -115,6 +158,7 @@ pub fn create_viewer() -> Builder<Wry> {
             std::collections::HashMap::new(),
         )),
         db: std::sync::Arc::new(db),
+        embedding_service,
     };
     let viewers_to_restore = saved_state.viewers.clone();
     let explorers_to_restore = saved_state.explorers.clone();
@@ -293,5 +337,9 @@ pub fn create_viewer() -> Builder<Wry> {
             get_active_viewer_directory,
             close_viewer_tabs_by_directory,
             record_folder_view,
+            // Phase 4: Recommendation commands
+            rebuild_recommendations,
+            is_rebuilding_recommendations,
+            get_recommendation_scores,
         ])
 }
