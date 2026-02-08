@@ -5,7 +5,6 @@
     "eamodio.gitlens",
     "esbenp.prettier-vscode",
     "stylelint.vscode-stylelint",
-    "bradlc.vscode-tailwindcss",
-    "zxh404.vscode-proto3"
+    "bradlc.vscode-tailwindcss"
   ]
 }
