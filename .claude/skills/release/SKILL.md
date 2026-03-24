@@ -5,12 +5,10 @@
 
 ## 起動条件
 
-以下のような依頼を受けたときに、このスキルを使用する:
+バージョン番号を更新してリリース作業を行う意図の依頼を受けたとき。
+具体的な表現・粒度（patch/minor/major）・言語は問わない。
 
-- 「リリースして」
-- 「バージョンを上げて」
-- 「vup して」
-- 「release を出して」
+例: 「リリースして」「バージョン上げて」「vup して」「パッチ/マイナー/メジャーバージョン上げて」「release を出して」など
 
 ## 依存ツール
 
@@ -43,11 +41,13 @@ gh auth status
 
 ### Step 1: 現在のバージョン確認
 
-`package.json` を読み取って現在のバージョンを表示し、ユーザーに新しいバージョン番号を確認する。
+`package.json` を読み取って現在のバージョンを表示する。
+依頼の内容から bump の粒度（patch/minor/major）が読み取れる場合は次のバージョンを自動提案し、ユーザーに確認を求める。
+粒度が不明な場合は入力を促す。
 
 ```
 現在のバージョン: X.Y.Z
-新しいバージョン番号を入力してください:
+→ 新しいバージョン: X.Y.Z+1 でよいですか？（違う場合は番号を入力）
 ```
 
 確認が取れるまで次のステップには進まない。
@@ -81,40 +81,74 @@ git checkout master
 
 ### Step 5: GitHub Actions の完了を待機
 
-新バージョンのタグ付きドラフトリリースが作成され、`latest.json` アセットが含まれるまでポーリングする。
+release ブランチへの push で起動したワークフローの完了を `gh run view` でポーリングする。
+`latest.json` の存在チェックは macOS ジョブが先行してアップロードした時点で誤検知するため使用しない。
 最大 30 分（30 秒ごとに最大 60 回）待機する。
 
 ```bash
 VERSION="vX.Y.Z"
 REPO="march-works/simple-image-viewer"
-release_id=""
 
-for i in $(seq 1 60); do
-  release_id=$(gh api repos/$REPO/releases \
-    --jq ".[] | select(.draft == true and .tag_name == \"$VERSION\") | .id")
-  if [ -n "$release_id" ]; then
-    has_latest=$(gh api repos/$REPO/releases/$release_id \
-      --jq '.assets[] | select(.name == "latest.json") | .name')
-    if [ -n "$has_latest" ]; then
-      echo "Build complete! release_id=$release_id"
-      break
-    fi
+# push 直後は run がまだ登録されていない場合があるため少し待つ
+sleep 15
+
+# release ブランチの最新 run ID を取得
+run_id=""
+for i in $(seq 1 10); do
+  run_id=$(gh run list --repo $REPO --branch release --limit 1 --json databaseId --jq '.[0].databaseId')
+  if [ -n "$run_id" ]; then
+    echo "Found run: $run_id"
+    break
   fi
-  echo "Waiting for GitHub Actions... ($i/60)"
+  echo "Waiting for run to appear... ($i/10)"
+  sleep 10
+done
+
+if [ -z "$run_id" ]; then
+  echo "Error: Could not find Actions run."
+  exit 1
+fi
+
+# ワークフローの完了を待機
+build_done=""
+for i in $(seq 1 60); do
+  conclusion=$(gh run view $run_id --repo $REPO --json status,conclusion \
+    --jq 'if .status == "completed" then .conclusion else "pending" end')
+  if [ "$conclusion" = "success" ]; then
+    build_done="true"
+    echo "GitHub Actions completed successfully!"
+    break
+  elif [ "$conclusion" != "pending" ] && [ "$conclusion" != "in_progress" ]; then
+    echo "GitHub Actions failed: $conclusion"
+    exit 1
+  fi
+  echo "Waiting for GitHub Actions... ($i/60) [$(gh run view $run_id --repo $REPO --json status --jq '.status')]"
   sleep 30
 done
 
-if [ -z "$release_id" ]; then
+if [ -z "$build_done" ]; then
   echo "Timeout: GitHub Actions did not complete within 30 minutes."
   exit 1
 fi
+
+# ドラフトリリースの ID を取得
+release_id=$(gh api repos/$REPO/releases \
+  --jq ".[] | select(.draft == true and .tag_name == \"$VERSION\") | .id")
+
+if [ -z "$release_id" ]; then
+  echo "Error: Could not find draft release for $VERSION"
+  exit 1
+fi
+
+echo "Build complete! release_id=$release_id"
 ```
 
 ### Step 6: Draft を解除して正式リリース
 
 ```bash
 gh api --method PATCH repos/march-works/simple-image-viewer/releases/$release_id \
-  -f draft=false
+  -f draft=false \
+  -f make_latest=true
 ```
 
 ### Step 7: Gist を latest.json で更新
