@@ -1,0 +1,39 @@
+{
+  "$schema": "https://claude.ai/code/settings-schema.json",
+  "projectName": "Simple Image Viewer",
+  "description": "A desktop application for viewing images, videos, and ZIP contents built with Tauri + SolidJS + Rust",
+  "rules": [
+    "rules/architecture.md",
+    "rules/rust-backend.md",
+    "rules/solidjs-frontend.md",
+    "rules/tauri-ipc.md"
+  ],
+  "subagents": [
+    "subagents/rust-reviewer.md",
+    "subagents/solidjs-reviewer.md"
+  ],
+  "conventions": {
+    "languages": {
+      "rust": {
+        "edition": "2021",
+        "style": "rustfmt",
+        "errorHandling": "anyhow for utils, Result<T, String> for commands"
+      },
+      "typescript": {
+        "style": "eslint + prettier",
+        "framework": "SolidJS",
+        "patternMatching": "ts-pattern"
+      }
+    },
+    "architecture": {
+      "backend": "3-layer (app -> service -> utils)",
+      "frontend": "pages -> features -> components"
+    }
+  },
+  "ignorePatterns": [
+    "node_modules/",
+    "target/",
+    "dist/",
+    "*.lock"
+  ]
+}
