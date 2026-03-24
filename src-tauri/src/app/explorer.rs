@@ -24,8 +24,13 @@ pub(crate) async fn transfer_folder(
     state: State<'_, AppState>,
     app: AppHandle,
 ) -> Result<(), String> {
-    let options = CopyOptions::new();
-    move_dir(from, to, &options).map_err(|e| format!("failed to move folder: {e}"))?;
+    // spawn_blocking でファイル移動（同期 I/O）を実行
+    tokio::task::spawn_blocking(move || {
+        let options = CopyOptions::new();
+        move_dir(from, to, &options).map_err(|e| format!("failed to move folder: {e}"))
+    })
+    .await
+    .map_err(|e| format!("Failed to spawn blocking task: {}", e))??;
 
     // フォルダ移動した結果の表示更新
     let (index, (path, mut page, sort, search_query)) =
@@ -41,7 +46,7 @@ pub(crate) async fn transfer_folder(
         state.dir_list_cache.clone(),
         &sort,
         search_query.as_deref(),
-        Some(&state.db),
+        Some(state.db.clone()),
     )
     .await?;
     if page > total_pages {
@@ -184,7 +189,7 @@ pub(crate) async fn change_explorer_path(
         state.dir_list_cache.clone(),
         &sort,
         search_query.as_deref(),
-        Some(&state.db),
+        Some(state.db.clone()),
     )
     .await?;
 
@@ -299,7 +304,7 @@ pub(crate) async fn change_explorer_page(
         state.dir_list_cache.clone(),
         &sort,
         search_query.as_deref(),
-        Some(&state.db),
+        Some(state.db.clone()),
     )
     .await?;
     let tab_state = update_tab_state(&label, index, page, thumbnails, total_pages, &state).await?;
@@ -336,7 +341,7 @@ pub(crate) async fn move_explorer_forward(
         state.dir_list_cache.clone(),
         &sort,
         search_query.as_deref(),
-        Some(&state.db),
+        Some(state.db.clone()),
     )
     .await?;
     if page > total_pages {
@@ -371,7 +376,7 @@ pub(crate) async fn move_explorer_backward(
         state.dir_list_cache.clone(),
         &sort,
         search_query.as_deref(),
-        Some(&state.db),
+        Some(state.db.clone()),
     )
     .await?;
     update_tab_and_emit(&label, index, page, thumbnails, total_pages, &state, &app).await?;
@@ -394,7 +399,7 @@ pub(crate) async fn move_explorer_to_end(
         state.dir_list_cache.clone(),
         &sort,
         search_query.as_deref(),
-        Some(&state.db),
+        Some(state.db.clone()),
     )
     .await?;
     let page = total_pages;
@@ -405,7 +410,7 @@ pub(crate) async fn move_explorer_to_end(
         state.dir_list_cache.clone(),
         &sort,
         search_query.as_deref(),
-        Some(&state.db),
+        Some(state.db.clone()),
     )
     .await?;
 
@@ -430,7 +435,7 @@ pub(crate) async fn move_explorer_to_start(
         state.dir_list_cache.clone(),
         &sort,
         search_query.as_deref(),
-        Some(&state.db),
+        Some(state.db.clone()),
     )
     .await?;
     update_tab_and_emit(&label, index, page, thumbnails, total_pages, &state, &app).await?;
@@ -487,7 +492,7 @@ pub(crate) async fn refresh_explorer_tab(
         state.dir_list_cache.clone(),
         &sort,
         search_query.as_deref(),
-        Some(&state.db),
+        Some(state.db.clone()),
     )
     .await?;
     update_tab_and_emit(&label, index, page, thumbnails, total_pages, &state, &app).await?;
@@ -528,7 +533,7 @@ pub(crate) async fn change_explorer_sort(
             state.dir_list_cache.clone(),
             &sort,
             search_query.as_deref(),
-            Some(&state.db),
+            Some(state.db.clone()),
         )
         .await?;
         update_tab_and_emit(&label, index, 1, thumbnails, total_pages, &state, &app).await?;
@@ -573,7 +578,7 @@ pub(crate) async fn change_explorer_search(
             state.dir_list_cache.clone(),
             &sort,
             query.as_deref(),
-            Some(&state.db),
+            Some(state.db.clone()),
         )
         .await?;
         update_tab_and_emit(&label, index, 1, thumbnails, total_pages, &state, &app).await?;

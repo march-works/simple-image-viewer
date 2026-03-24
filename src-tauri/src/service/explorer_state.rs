@@ -2,7 +2,6 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::fs::read_dir;
 use std::sync::Arc;
 use sysinfo::Disks;
 use tauri::State;
@@ -434,6 +433,106 @@ fn calculate_recommendation_scores(db: &Database, folder_paths: &[String]) -> Ha
     scores
 }
 
+/// ディレクトリをスキャン・ソートし、CachedDirEntry 一覧を返す（同期関数、spawn_blocking から呼ぶ）
+fn scan_and_sort_dirs_sync(
+    filepath: &str,
+    sort: &SortConfig,
+    search_query: Option<&str>,
+    db: Option<&Database>,
+) -> Result<Vec<CachedDirEntry>, String> {
+    use std::time::UNIX_EPOCH;
+
+    let dirs = std::fs::read_dir(filepath).map_err(|_| "failed to open path")?;
+    let mut entries: Vec<_> = dirs
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().is_dir())
+        .collect();
+
+    // 検索フィルタリング
+    if let Some(query) = search_query {
+        if !query.is_empty() {
+            let query_lower = query.to_lowercase();
+            entries.retain(|e| {
+                e.file_name()
+                    .to_str()
+                    .map(|name| name.to_lowercase().contains(&query_lower))
+                    .unwrap_or(false)
+            });
+        }
+    }
+
+    // メタデータ取得
+    let mut entries_with_meta: Vec<_> = entries
+        .into_iter()
+        .map(|e| {
+            let metadata = e.metadata().ok();
+            let modified = metadata
+                .as_ref()
+                .and_then(|m| m.modified().ok())
+                .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+                .map(|d| d.as_secs());
+            let created = metadata
+                .as_ref()
+                .and_then(|m| m.created().ok())
+                .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+                .map(|d| d.as_secs());
+            (e, modified, created)
+        })
+        .collect();
+
+    // ソート実行
+    match (&sort.field, &sort.order) {
+        (SortField::Name, SortOrder::Asc) => {
+            entries_with_meta.sort_by(|a, b| a.0.file_name().cmp(&b.0.file_name()));
+        }
+        (SortField::Name, SortOrder::Desc) => {
+            entries_with_meta.sort_by(|a, b| b.0.file_name().cmp(&a.0.file_name()));
+        }
+        (SortField::DateModified, SortOrder::Asc) => {
+            entries_with_meta.sort_by(|a, b| a.1.cmp(&b.1));
+        }
+        (SortField::DateModified, SortOrder::Desc) => {
+            entries_with_meta.sort_by(|a, b| b.1.cmp(&a.1));
+        }
+        (SortField::DateCreated, SortOrder::Asc) => {
+            entries_with_meta.sort_by(|a, b| a.2.cmp(&b.2));
+        }
+        (SortField::DateCreated, SortOrder::Desc) => {
+            entries_with_meta.sort_by(|a, b| b.2.cmp(&a.2));
+        }
+        (SortField::Recommendation, _) => {
+            if let Some(db) = db {
+                let folder_paths: Vec<String> = entries_with_meta
+                    .iter()
+                    .map(|(e, _, _)| e.path().to_str().unwrap_or_default().to_string())
+                    .collect();
+                let scores = calculate_recommendation_scores(db, &folder_paths);
+                entries_with_meta.sort_by(|a, b| {
+                    let path_a = a.0.path().to_str().unwrap_or_default().to_string();
+                    let path_b = b.0.path().to_str().unwrap_or_default().to_string();
+                    let score_a = scores.get(&path_a).unwrap_or(&0.0);
+                    let score_b = scores.get(&path_b).unwrap_or(&0.0);
+                    score_b
+                        .partial_cmp(score_a)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                });
+            } else {
+                entries_with_meta.sort_by(|a, b| b.1.cmp(&a.1));
+            }
+        }
+    }
+
+    Ok(entries_with_meta
+        .into_iter()
+        .map(|(e, modified, created)| CachedDirEntry {
+            path: e.path().to_str().unwrap_or_default().to_string(),
+            filename: e.file_name().to_str().unwrap_or_default().to_string(),
+            modified_at: modified,
+            created_at: created,
+        })
+        .collect())
+}
+
 /// ディレクトリスキャン、ソート、ページネーション、サムネイル抽出を統合した最適化版
 /// dir_list_cache を利用して同一条件の再スキャンを省略する
 pub(crate) async fn explore_path_with_count(
@@ -443,10 +542,8 @@ pub(crate) async fn explore_path_with_count(
     dir_list_cache: Arc<RwLock<HashMap<String, Vec<CachedDirEntry>>>>,
     sort: &SortConfig,
     search_query: Option<&str>,
-    db: Option<&Database>,
+    db: Option<Arc<Database>>,
 ) -> Result<(Vec<Thumbnail>, usize), String> {
-    use std::time::UNIX_EPOCH;
-
     let cache_key = make_dir_list_cache_key(filepath, sort, search_query);
 
     // 1. ディレクトリリストキャッシュをチェック
@@ -458,98 +555,22 @@ pub(crate) async fn explore_path_with_count(
     let all_entries: Vec<CachedDirEntry> = if let Some(entries) = cached {
         entries
     } else {
-        // キャッシュミス: ディレクトリスキャン実行
-        let dirs = read_dir(filepath).map_err(|_| "failed to open path")?;
-        let mut entries: Vec<_> = dirs
-            .filter_map(|e| e.ok())
-            .filter(|e| e.path().is_dir())
-            .collect();
+        // キャッシュミス: spawn_blocking でブロッキング I/O を非同期コンテキスト外で実行
+        let filepath_owned = filepath.to_string();
+        let sort_clone = sort.clone();
+        let search_owned = search_query.map(String::from);
+        let db_clone = db.clone();
 
-        // 検索フィルタリング
-        if let Some(query) = search_query {
-            if !query.is_empty() {
-                let query_lower = query.to_lowercase();
-                entries.retain(|e| {
-                    e.file_name()
-                        .to_str()
-                        .map(|name| name.to_lowercase().contains(&query_lower))
-                        .unwrap_or(false)
-                });
-            }
-        }
-
-        // メタデータ取得してソート
-        let mut entries_with_meta: Vec<_> = entries
-            .into_iter()
-            .map(|e| {
-                let metadata = e.metadata().ok();
-                let modified = metadata
-                    .as_ref()
-                    .and_then(|m| m.modified().ok())
-                    .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-                    .map(|d| d.as_secs());
-                let created = metadata
-                    .as_ref()
-                    .and_then(|m| m.created().ok())
-                    .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-                    .map(|d| d.as_secs());
-                (e, modified, created)
-            })
-            .collect();
-
-        // ソート実行
-        match (&sort.field, &sort.order) {
-            (SortField::Name, SortOrder::Asc) => {
-                entries_with_meta.sort_by(|a, b| a.0.file_name().cmp(&b.0.file_name()));
-            }
-            (SortField::Name, SortOrder::Desc) => {
-                entries_with_meta.sort_by(|a, b| b.0.file_name().cmp(&a.0.file_name()));
-            }
-            (SortField::DateModified, SortOrder::Asc) => {
-                entries_with_meta.sort_by(|a, b| a.1.cmp(&b.1));
-            }
-            (SortField::DateModified, SortOrder::Desc) => {
-                entries_with_meta.sort_by(|a, b| b.1.cmp(&a.1));
-            }
-            (SortField::DateCreated, SortOrder::Asc) => {
-                entries_with_meta.sort_by(|a, b| a.2.cmp(&b.2));
-            }
-            (SortField::DateCreated, SortOrder::Desc) => {
-                entries_with_meta.sort_by(|a, b| b.2.cmp(&a.2));
-            }
-            // リコメンドソート: DBから埋め込みスコアを計算してソート
-            (SortField::Recommendation, _) => {
-                if let Some(db) = db {
-                    let folder_paths: Vec<String> = entries_with_meta
-                        .iter()
-                        .map(|(e, _, _)| e.path().to_str().unwrap_or_default().to_string())
-                        .collect();
-                    let scores = calculate_recommendation_scores(db, &folder_paths);
-                    entries_with_meta.sort_by(|a, b| {
-                        let path_a = a.0.path().to_str().unwrap_or_default().to_string();
-                        let path_b = b.0.path().to_str().unwrap_or_default().to_string();
-                        let score_a = scores.get(&path_a).unwrap_or(&0.0);
-                        let score_b = scores.get(&path_b).unwrap_or(&0.0);
-                        score_b
-                            .partial_cmp(score_a)
-                            .unwrap_or(std::cmp::Ordering::Equal)
-                    });
-                } else {
-                    entries_with_meta.sort_by(|a, b| b.1.cmp(&a.1));
-                }
-            }
-        }
-
-        // CachedDirEntry に変換してキャッシュへ保存
-        let new_entries: Vec<CachedDirEntry> = entries_with_meta
-            .into_iter()
-            .map(|(e, modified, created)| CachedDirEntry {
-                path: e.path().to_str().unwrap_or_default().to_string(),
-                filename: e.file_name().to_str().unwrap_or_default().to_string(),
-                modified_at: modified,
-                created_at: created,
-            })
-            .collect();
+        let new_entries = tokio::task::spawn_blocking(move || {
+            scan_and_sort_dirs_sync(
+                &filepath_owned,
+                &sort_clone,
+                search_owned.as_deref(),
+                db_clone.as_deref(),
+            )
+        })
+        .await
+        .map_err(|e| format!("Failed to scan directory: {}", e))??;
 
         {
             let mut w = dir_list_cache.write().await;
