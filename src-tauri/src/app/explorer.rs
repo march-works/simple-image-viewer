@@ -4,13 +4,14 @@ use tauri::{AppHandle, Emitter, State, WebviewUrl, WebviewWindowBuilder};
 
 use crate::service::app_state::AppState;
 use crate::service::explorer_state::{
-    add_explorer_state, add_explorer_tab_state, explore_path_with_count,
-    get_active_tab_state_query, get_tab_index_by_key, get_tab_state_by_index,
-    get_tab_state_query_by_key, remove_explorer_tab_state, reset_explorer_tab_state,
-    update_tab_state, Thumbnail,
+    add_explorer_state, add_explorer_tab_state, clear_dir_list_cache_for_dir,
+    explore_path_with_count, get_active_tab_state_query, get_tab_index_by_key,
+    get_tab_state_by_index, get_tab_state_query_by_key, remove_explorer_tab_state,
+    reset_explorer_tab_state, update_tab_state, Thumbnail,
 };
 use crate::service::explorer_types::SortConfig;
 use crate::service::types::ActiveTab;
+use crate::utils::file_utils::find_first_image_in_folder;
 use crate::utils::watcher_utils::{
     create_explorer_watcher_callback, subscribe_directory, unsubscribe_directory,
 };
@@ -23,20 +24,29 @@ pub(crate) async fn transfer_folder(
     state: State<'_, AppState>,
     app: AppHandle,
 ) -> Result<(), String> {
-    let options = CopyOptions::new();
-    move_dir(from, to, &options).map_err(|_| "failed to move folder")?;
+    // spawn_blocking でファイル移動（同期 I/O）を実行
+    tokio::task::spawn_blocking(move || {
+        let options = CopyOptions::new();
+        move_dir(from, to, &options).map_err(|e| format!("failed to move folder: {e}"))
+    })
+    .await
+    .map_err(|e| format!("Failed to spawn blocking task: {}", e))??;
 
     // フォルダ移動した結果の表示更新
     let (index, (path, mut page, sort, search_query)) =
         get_active_tab_state_query(&label, &state, |p| p).await?;
 
+    // フォルダが移動されたのでキャッシュを無効化
+    clear_dir_list_cache_for_dir(&path, state.dir_list_cache.clone()).await;
+
     let (thumbnails, total_pages) = explore_path_with_count(
         &path,
         page,
         state.thumbnail_cache.clone(),
+        state.dir_list_cache.clone(),
         &sort,
         search_query.as_deref(),
-        Some(&state.db),
+        Some(state.db.clone()),
     )
     .await?;
     if page > total_pages {
@@ -112,12 +122,14 @@ pub(crate) async fn request_restore_explorer_state<'a>(
     state: State<'a, AppState>,
     app: AppHandle,
 ) -> Result<(), String> {
-    let mut explorers = state.explorers.lock().await;
+    let explorers = state.explorers.lock().await;
     let explorer_state = (*explorers)
-        .iter_mut()
+        .iter()
         .find(|w| w.label == label)
         .ok_or_else(|| "explorer not found".to_string())?;
-    app.emit_to(&label, "explorer-state-changed", explorer_state.clone())
+    let cloned = explorer_state.clone();
+    drop(explorers);
+    app.emit_to(&label, "explorer-state-changed", &cloned)
         .map_err(|_| "failed to emit explorer state".to_string())?;
     Ok(())
 }
@@ -129,17 +141,19 @@ pub(crate) async fn request_restore_explorer_tab_state<'a>(
     state: State<'a, AppState>,
     app: AppHandle,
 ) -> Result<(), String> {
-    let mut explorers = state.explorers.lock().await;
+    let explorers = state.explorers.lock().await;
     let explorer_state = (*explorers)
-        .iter_mut()
+        .iter()
         .find(|w| w.label == label)
         .ok_or_else(|| "explorer not found".to_string())?;
     let tab_state = explorer_state
         .tabs
-        .iter_mut()
+        .iter()
         .find(|t| t.key == key)
-        .ok_or_else(|| "tab not found".to_string())?;
-    app.emit_to(&label, "explorer-tab-state-changed", tab_state.clone())
+        .ok_or_else(|| "tab not found".to_string())?
+        .clone();
+    drop(explorers);
+    app.emit_to(&label, "explorer-tab-state-changed", &tab_state)
         .map_err(|_| "failed to emit explorer state".to_string())?;
     Ok(())
 }
@@ -172,9 +186,10 @@ pub(crate) async fn change_explorer_path(
         &path,
         1,
         state.thumbnail_cache.clone(),
+        state.dir_list_cache.clone(),
         &sort,
         search_query.as_deref(),
-        Some(&state.db),
+        Some(state.db.clone()),
     )
     .await?;
 
@@ -286,9 +301,10 @@ pub(crate) async fn change_explorer_page(
         &path,
         page,
         state.thumbnail_cache.clone(),
+        state.dir_list_cache.clone(),
         &sort,
         search_query.as_deref(),
-        Some(&state.db),
+        Some(state.db.clone()),
     )
     .await?;
     let tab_state = update_tab_state(&label, index, page, thumbnails, total_pages, &state).await?;
@@ -322,9 +338,10 @@ pub(crate) async fn move_explorer_forward(
         &path,
         page,
         state.thumbnail_cache.clone(),
+        state.dir_list_cache.clone(),
         &sort,
         search_query.as_deref(),
-        Some(&state.db),
+        Some(state.db.clone()),
     )
     .await?;
     if page > total_pages {
@@ -356,9 +373,10 @@ pub(crate) async fn move_explorer_backward(
         &path,
         page,
         state.thumbnail_cache.clone(),
+        state.dir_list_cache.clone(),
         &sort,
         search_query.as_deref(),
-        Some(&state.db),
+        Some(state.db.clone()),
     )
     .await?;
     update_tab_and_emit(&label, index, page, thumbnails, total_pages, &state, &app).await?;
@@ -378,9 +396,10 @@ pub(crate) async fn move_explorer_to_end(
         &path,
         1,
         state.thumbnail_cache.clone(),
+        state.dir_list_cache.clone(),
         &sort,
         search_query.as_deref(),
-        Some(&state.db),
+        Some(state.db.clone()),
     )
     .await?;
     let page = total_pages;
@@ -388,9 +407,10 @@ pub(crate) async fn move_explorer_to_end(
         &path,
         page,
         state.thumbnail_cache.clone(),
+        state.dir_list_cache.clone(),
         &sort,
         search_query.as_deref(),
-        Some(&state.db),
+        Some(state.db.clone()),
     )
     .await?;
 
@@ -412,9 +432,10 @@ pub(crate) async fn move_explorer_to_start(
         &path,
         page,
         state.thumbnail_cache.clone(),
+        state.dir_list_cache.clone(),
         &sort,
         search_query.as_deref(),
-        Some(&state.db),
+        Some(state.db.clone()),
     )
     .await?;
     update_tab_and_emit(&label, index, page, thumbnails, total_pages, &state, &app).await?;
@@ -429,8 +450,12 @@ pub(crate) async fn subscribe_explorer_dir_notification(
     state: State<'_, AppState>,
     app: AppHandle,
 ) -> Result<(), String> {
-    let callback =
-        create_explorer_watcher_callback(app, dir_path.clone(), state.thumbnail_cache.clone());
+    let callback = create_explorer_watcher_callback(
+        app,
+        dir_path.clone(),
+        state.thumbnail_cache.clone(),
+        state.dir_list_cache.clone(),
+    );
 
     subscribe_directory(dir_path, &state, RecursiveMode::NonRecursive, callback).await
 }
@@ -457,13 +482,17 @@ pub(crate) async fn refresh_explorer_tab(
     let (index, (path, page, sort, search_query)) =
         get_tab_state_query_by_key(&label, &key, &state).await?;
 
+    // watcher コールバックと refresh コマンドの到着順が不定なためキャッシュを先にクリアする
+    clear_dir_list_cache_for_dir(&path, state.dir_list_cache.clone()).await;
+
     let (thumbnails, total_pages) = explore_path_with_count(
         &path,
         page,
         state.thumbnail_cache.clone(),
+        state.dir_list_cache.clone(),
         &sort,
         search_query.as_deref(),
-        Some(&state.db),
+        Some(state.db.clone()),
     )
     .await?;
     update_tab_and_emit(&label, index, page, thumbnails, total_pages, &state, &app).await?;
@@ -495,13 +524,16 @@ pub(crate) async fn change_explorer_sort(
 
     // パスがない場合（デバイス一覧）はソートしない
     if let Some(path) = path {
+        // ソート条件が変わるため古いキャッシュエントリを破棄する
+        clear_dir_list_cache_for_dir(&path, state.dir_list_cache.clone()).await;
         let (thumbnails, total_pages) = explore_path_with_count(
             &path,
             1,
             state.thumbnail_cache.clone(),
+            state.dir_list_cache.clone(),
             &sort,
             search_query.as_deref(),
-            Some(&state.db),
+            Some(state.db.clone()),
         )
         .await?;
         update_tab_and_emit(&label, index, 1, thumbnails, total_pages, &state, &app).await?;
@@ -537,13 +569,16 @@ pub(crate) async fn change_explorer_search(
 
     // パスがない場合（デバイス一覧）は検索しない
     if let Some(path) = path {
+        // 検索条件が変わるため古いキャッシュエントリを破棄する
+        clear_dir_list_cache_for_dir(&path, state.dir_list_cache.clone()).await;
         let (thumbnails, total_pages) = explore_path_with_count(
             &path,
             1,
             state.thumbnail_cache.clone(),
+            state.dir_list_cache.clone(),
             &sort,
             query.as_deref(),
-            Some(&state.db),
+            Some(state.db.clone()),
         )
         .await?;
         update_tab_and_emit(&label, index, 1, thumbnails, total_pages, &state, &app).await?;
@@ -781,30 +816,6 @@ pub(crate) async fn rebuild_recommendations(
     });
 
     Ok(())
-}
-
-/// フォルダの最初の画像ファイルを見つける
-fn find_first_image_in_folder(folder_path: &std::path::Path) -> String {
-    use std::fs::read_dir;
-
-    let extensions = [
-        "jpg", "jpeg", "JPG", "JPEG", "jpe", "jfif", "pjpeg", "pjp", "png", "PNG", "gif", "tif",
-        "tiff", "bmp", "dib", "webp",
-    ];
-
-    if let Ok(inner_file) = read_dir(folder_path) {
-        for entry in inner_file.flatten() {
-            let path = entry.path();
-            let ext = path
-                .extension()
-                .and_then(|e| e.to_str())
-                .unwrap_or_default();
-            if extensions.contains(&ext) {
-                return path.to_str().unwrap_or_default().to_string();
-            }
-        }
-    }
-    String::new()
 }
 
 /// リコメンド再構築が処理中かどうかを取得

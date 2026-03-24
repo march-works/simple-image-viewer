@@ -74,6 +74,39 @@ pub(crate) async fn refresh_viewer_tab_tree(
     state: State<'_, AppState>,
     app: AppHandle,
 ) -> Result<(), String> {
+    // ロックを短時間だけ保持して必要な情報を取得する
+    let (path, is_compressed, current_key) = {
+        let viewers = state.viewers.lock().await;
+        let viewer_state = (*viewers)
+            .iter()
+            .find(|w| w.label == label)
+            .ok_or_else(|| "viewer not found".to_string())?;
+        let tab_state = viewer_state
+            .tabs
+            .iter()
+            .find(|t| t.key == tab_key)
+            .ok_or_else(|| "tab not found".to_string())?;
+        let is_compressed = tab_state
+            .viewing
+            .as_ref()
+            .map(|v| v.file_type == "Zip")
+            .unwrap_or(false);
+        let current_key = tab_state.viewing.as_ref().map(|v| v.key.clone());
+        (tab_state.path.clone(), is_compressed, current_key)
+    }; // ロック解放
+
+    // ファイルツリー再構築をロック外のブロッキングスレッドで実行
+    let new_tree = tokio::task::spawn_blocking(move || rebuild_file_tree(&path, is_compressed))
+        .await
+        .map_err(|e| format!("Failed to rebuild file tree: {}", e))?;
+
+    let new_viewing = if let Some(key) = current_key {
+        find_key_in_tree(&new_tree, &key)
+    } else {
+        None
+    };
+
+    // ロックを再取得して状態を更新する
     let mut viewers = state.viewers.lock().await;
     let viewer_state = (*viewers)
         .iter_mut()
@@ -84,24 +117,6 @@ pub(crate) async fn refresh_viewer_tab_tree(
         .iter_mut()
         .find(|t| t.key == tab_key)
         .ok_or_else(|| "tab not found".to_string())?;
-
-    // ZIPファイルかどうかを判定（viewing.file_typeで判断）
-    let is_compressed = tab_state
-        .viewing
-        .as_ref()
-        .map(|v| v.file_type == "Zip")
-        .unwrap_or(false);
-
-    // ファイルツリーを再構築
-    let new_tree = rebuild_file_tree(&tab_state.path, is_compressed);
-
-    // 現在表示中のファイルがまだ存在するか確認
-    let current_key = tab_state.viewing.as_ref().map(|v| v.key.clone());
-    let new_viewing = if let Some(key) = current_key {
-        find_key_in_tree(&new_tree, &key)
-    } else {
-        None
-    };
 
     tab_state.tree = new_tree;
     tab_state.viewing = new_viewing;

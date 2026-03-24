@@ -86,34 +86,48 @@ pub(crate) async fn add_viewer_tab_state<'a>(
     label: &String,
     state: &State<'a, AppState>,
 ) -> Result<ViewerState, String> {
-    let mut viewers = state.viewers.lock().await;
-    let viewer_state = (*viewers)
-        .iter_mut()
-        .find(|w| w.label == *label)
-        .ok_or_else(|| "viewer not found".to_string())?;
-    viewer_state.count += 1;
-    let key = format!("tab-{}", viewer_state.count);
+    let is_compressed = is_compressed_file(path);
     let title = if is_executable_file(path) {
         get_parent_dir_name(path)
     } else {
         get_filename_without_extension(path)
     };
-    let new_path = if is_compressed_file(path) {
+    let new_path = if is_compressed {
         path.clone()
     } else {
         get_parent_dir(path)
     };
-    let tree = if is_compressed_file(path) {
-        get_compressed_file_tree(&new_path)
-    } else {
-        let mut key_count = 0;
-        get_file_tree(&new_path, &mut key_count)
+
+    // ロックを短時間だけ保持してタブキーを生成する
+    let key = {
+        let mut viewers = state.viewers.lock().await;
+        let viewer_state = (*viewers)
+            .iter_mut()
+            .find(|w| w.label == *label)
+            .ok_or_else(|| "viewer not found".to_string())?;
+        viewer_state.count += 1;
+        format!("tab-{}", viewer_state.count)
     };
-    let viewing = if is_compressed_file(path) {
+
+    // ファイルツリー構築をロック外のブロッキングスレッドで実行（同期 I/O がロックを長期保持しないよう分離）
+    let new_path_clone = new_path.clone();
+    let tree = tokio::task::spawn_blocking(move || {
+        if is_compressed {
+            get_compressed_file_tree(&new_path_clone)
+        } else {
+            let mut key_count = 0;
+            get_file_tree(&new_path_clone, &mut key_count)
+        }
+    })
+    .await
+    .map_err(|e| format!("Failed to build file tree: {}", e))?;
+
+    let viewing = if is_compressed {
         find_first_file(&tree)
     } else {
         find_path_in_tree(&tree, path)
     };
+
     let tab = ViewerTabState {
         title,
         key: key.clone(),
@@ -121,8 +135,15 @@ pub(crate) async fn add_viewer_tab_state<'a>(
         viewing,
         tree,
     };
-    viewer_state.tabs.push(tab.clone());
-    viewer_state.active = Some(ActiveTab { key: key.clone() });
+
+    // ロックを再取得してタブを追加する
+    let mut viewers = state.viewers.lock().await;
+    let viewer_state = (*viewers)
+        .iter_mut()
+        .find(|w| w.label == *label)
+        .ok_or_else(|| "viewer not found".to_string())?;
+    viewer_state.tabs.push(tab);
+    viewer_state.active = Some(ActiveTab { key });
     Ok(viewer_state.clone())
 }
 

@@ -124,3 +124,25 @@ pub(crate) fn get_any_extensions() -> Vec<String> {
 pub(crate) fn normalize_path(path: &str) -> String {
     path.replace('\\', "/").to_lowercase()
 }
+
+/// フォルダ内の最初の画像ファイルのパスを返す
+/// 画像が見つからない場合は空文字列を返す
+pub(crate) fn find_first_image_in_folder(folder_path: &std::path::Path) -> String {
+    use std::fs::read_dir;
+
+    let extensions = get_image_extensions();
+
+    if let Ok(entries) = read_dir(folder_path) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let ext = path
+                .extension()
+                .and_then(|e| e.to_str())
+                .unwrap_or_default();
+            if extensions.iter().any(|v| v == ext) {
+                return path.to_str().unwrap_or_default().to_string();
+            }
+        }
+    }
+    String::new()
+}
