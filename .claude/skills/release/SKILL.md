@@ -17,7 +17,21 @@
 - `git` CLI（必須）
 - `gh` CLI（必須）
 
-スキル起動時に最初に認証状態を確認する:
+スキル起動時に最初に `gh` コマンドが使えるか確認する:
+
+```bash
+which gh || echo "not found"
+```
+
+見つからない場合は `~/bin/gh` にシンボリックリンクを作成するよう案内する:
+
+```bash
+ln -sf "/c/Program Files/GitHub CLI/gh.exe" ~/bin/gh
+```
+
+それでも解決しない場合はユーザーに手動での対応を依頼して終了する。
+
+次に認証状態を確認する:
 
 ```bash
 gh auth status
@@ -59,6 +73,7 @@ git push origin master
 
 ```bash
 git checkout release
+git pull origin release
 git merge master
 git push origin release
 git checkout master
@@ -112,12 +127,12 @@ url=$(gh api repos/march-works/simple-image-viewer/releases/$release_id \
 # latest.json の内容を取得
 content=$(curl -sL "$url")
 
-# Gist のファイル名を取得
-filename=$(gh api /gists/e7c9399157590f0fb28882ff7cbe31dd \
+# Gist のファイル名を取得（先頭スラッシュなし: Git Bash のパス変換を回避）
+filename=$(gh api gists/e7c9399157590f0fb28882ff7cbe31dd \
   --jq '.files | keys[0]')
 
 # Gist を更新
-gh api --method PATCH /gists/e7c9399157590f0fb28882ff7cbe31dd \
+gh api --method PATCH gists/e7c9399157590f0fb28882ff7cbe31dd \
   -f "files[$filename][content]=$content"
 
 echo "Gist updated successfully!"

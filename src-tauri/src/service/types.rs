@@ -8,7 +8,7 @@ use tokio::sync::{Mutex, RwLock};
 
 use super::database::Database;
 use super::embedding_service::EmbeddingService;
-use super::explorer_state::ExplorerState;
+use super::explorer_state::{CachedDirEntry, ExplorerState};
 use super::viewer_state::ViewerState;
 
 // ========================================
@@ -38,6 +38,9 @@ pub struct AppState {
     pub watchers: Mutex<HashMap<String, (RecommendedWatcher, usize)>>,
     /// サムネイルキャッシュ (folder_path -> thumbnail_path)
     pub thumbnail_cache: Arc<RwLock<HashMap<String, String>>>,
+    /// ディレクトリ一覧キャッシュ (cache_key -> ソート済みエントリ一覧)
+    /// cache_key = "{dir_path}|{sort_field:sort_order}|{search_query}"
+    pub dir_list_cache: Arc<RwLock<HashMap<String, Vec<CachedDirEntry>>>>,
     /// SQLite データベース (Phase 2: リコメンド基盤)
     pub db: Arc<Database>,
     /// CLIP 埋め込みサービス (Phase 4: ML リコメンド)

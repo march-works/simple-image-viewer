@@ -4,6 +4,7 @@ use std::sync::Arc;
 use tauri::{AppHandle, Emitter, State};
 
 use crate::service::app_state::AppState;
+use crate::service::explorer_state::CachedDirEntry;
 
 /// ディレクトリ監視を開始するヘルパー関数
 ///
@@ -51,7 +52,7 @@ pub async fn unsubscribe_directory(
     let mut watchers_guard = state.watchers.lock().await;
 
     if let Some((_, ref_count)) = watchers_guard.get_mut(&dir_path) {
-        *ref_count -= 1;
+        *ref_count = ref_count.saturating_sub(1);
         if *ref_count == 0 {
             watchers_guard.remove(&dir_path);
         }
@@ -64,16 +65,25 @@ pub fn create_explorer_watcher_callback(
     app: AppHandle,
     path: String,
     cache: Arc<tokio::sync::RwLock<std::collections::HashMap<String, String>>>,
+    dir_list_cache: Arc<
+        tokio::sync::RwLock<std::collections::HashMap<String, Vec<CachedDirEntry>>>,
+    >,
 ) -> impl Fn(NotifyResult<Event>) + Send + 'static {
     move |res| match res {
         Ok(_) => {
-            // ディレクトリ変更時にキャッシュをクリア
+            // ディレクトリ変更時にサムネイルキャッシュとディレクトリリストキャッシュをクリア
             let cache_clone = cache.clone();
+            let dir_list_cache_clone = dir_list_cache.clone();
             let path_clone = path.clone();
             tokio::spawn(async move {
                 crate::service::explorer_state::clear_thumbnail_cache_for_dir(
                     &path_clone,
                     cache_clone,
+                )
+                .await;
+                crate::service::explorer_state::clear_dir_list_cache_for_dir(
+                    &path_clone,
+                    dir_list_cache_clone,
                 )
                 .await;
             });
