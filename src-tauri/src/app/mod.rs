@@ -118,6 +118,9 @@ pub fn create_viewer() -> Builder<Wry> {
         thumbnail_cache: std::sync::Arc::new(tokio::sync::RwLock::new(
             std::collections::HashMap::new(),
         )),
+        dir_list_cache: std::sync::Arc::new(tokio::sync::RwLock::new(
+            std::collections::HashMap::new(),
+        )),
         db: std::sync::Arc::new(db),
         embedding_service: tokio::sync::RwLock::new(None),
     };

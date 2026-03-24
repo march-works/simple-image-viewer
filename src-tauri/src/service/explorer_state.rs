@@ -8,6 +8,8 @@ use sysinfo::Disks;
 use tauri::State;
 use tokio::sync::RwLock;
 
+use crate::utils::file_utils::find_first_image_in_folder;
+
 use crate::service::database::Database;
 use crate::service::embedding_service::{
     average_embeddings, cosine_similarity, embedding_from_bytes,
@@ -19,6 +21,15 @@ use super::types::{ActiveTab, AppState};
 // ========================================
 // 型定義
 // ========================================
+
+/// ディレクトリリストキャッシュ用エントリ（シリアライズ不要な軽量型）
+#[derive(Debug, Clone)]
+pub struct CachedDirEntry {
+    pub path: String,
+    pub filename: String,
+    pub modified_at: Option<u64>,
+    pub created_at: Option<u64>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Thumbnail {
@@ -58,14 +69,18 @@ pub struct ExplorerState {
 
 pub(crate) async fn add_explorer_state<'a>(state: &State<'a, AppState>) -> Result<String, String> {
     let mut explorers = state.explorers.lock().await;
-    let label = format!("explorer-{}", *state.count.lock().await);
+    let label = {
+        let mut count = state.count.lock().await;
+        let l = format!("explorer-{}", *count);
+        *count += 1;
+        l
+    };
     (*explorers).push(ExplorerState {
         label: label.clone(),
         count: 0,
         active: None,
         tabs: vec![],
     });
-    *state.count.lock().await += 1;
     Ok(label)
 }
 
@@ -298,26 +313,19 @@ pub(crate) async fn update_tab_state(
 
 const CATALOG_PER_PAGE: usize = 50;
 
-/// 最初の画像ファイルを見つける (キャッシュなしの場合の処理)
-fn find_first_image_in_folder(folder_path: &std::path::Path) -> String {
-    let extensions = vec![
-        "jpg", "jpeg", "JPG", "JPEG", "jpe", "jfif", "pjpeg", "pjp", "png", "PNG", "gif", "tif",
-        "tiff", "bmp", "dib", "webp",
-    ];
-
-    if let Ok(inner_file) = read_dir(folder_path) {
-        for entry in inner_file.flatten() {
-            let path = entry.path();
-            let ext = path
-                .extension()
-                .and_then(|e| e.to_str())
-                .unwrap_or_default();
-            if extensions.contains(&ext) {
-                return path.to_str().unwrap_or_default().to_string();
-            }
-        }
-    }
-    String::new()
+/// ディレクトリリストキャッシュのキーを生成する
+fn make_dir_list_cache_key(
+    filepath: &str,
+    sort: &SortConfig,
+    search_query: Option<&str>,
+) -> String {
+    format!(
+        "{}|{:?}:{:?}|{}",
+        filepath,
+        sort.field,
+        sort.order,
+        search_query.unwrap_or("")
+    )
 }
 
 /// リコメンドスコアを計算
@@ -427,113 +435,139 @@ fn calculate_recommendation_scores(db: &Database, folder_paths: &[String]) -> Ha
 }
 
 /// ディレクトリスキャン、ソート、ページネーション、サムネイル抽出を統合した最適化版
+/// dir_list_cache を利用して同一条件の再スキャンを省略する
 pub(crate) async fn explore_path_with_count(
     filepath: &str,
     page: usize,
     cache: Arc<RwLock<HashMap<String, String>>>,
+    dir_list_cache: Arc<RwLock<HashMap<String, Vec<CachedDirEntry>>>>,
     sort: &SortConfig,
     search_query: Option<&str>,
     db: Option<&Database>,
 ) -> Result<(Vec<Thumbnail>, usize), String> {
     use std::time::UNIX_EPOCH;
 
-    // 1. 単一スキャンで全エントリを収集
-    let dirs = read_dir(filepath).map_err(|_| "failed to open path")?;
-    let mut entries: Vec<_> = dirs
-        .filter_map(|e| e.ok())
-        .filter(|e| e.path().is_dir())
-        .collect();
+    let cache_key = make_dir_list_cache_key(filepath, sort, search_query);
 
-    // 2. 検索フィルタリング
-    if let Some(query) = search_query {
-        if !query.is_empty() {
-            let query_lower = query.to_lowercase();
-            entries.retain(|e| {
-                e.file_name()
-                    .to_str()
-                    .map(|name| name.to_lowercase().contains(&query_lower))
-                    .unwrap_or(false)
-            });
-        }
-    }
+    // 1. ディレクトリリストキャッシュをチェック
+    let cached = {
+        let r = dir_list_cache.read().await;
+        r.get(&cache_key).cloned()
+    };
 
-    // 3. メタデータ取得してソート
-    let mut entries_with_meta: Vec<_> = entries
-        .into_iter()
-        .map(|e| {
-            let metadata = e.metadata().ok();
-            let modified = metadata
-                .as_ref()
-                .and_then(|m| m.modified().ok())
-                .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-                .map(|d| d.as_secs());
-            let created = metadata
-                .as_ref()
-                .and_then(|m| m.created().ok())
-                .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-                .map(|d| d.as_secs());
-            (e, modified, created)
-        })
-        .collect();
+    let all_entries: Vec<CachedDirEntry> = if let Some(entries) = cached {
+        entries
+    } else {
+        // キャッシュミス: ディレクトリスキャン実行
+        let dirs = read_dir(filepath).map_err(|_| "failed to open path")?;
+        let mut entries: Vec<_> = dirs
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().is_dir())
+            .collect();
 
-    // ソート実行
-    match (&sort.field, &sort.order) {
-        (SortField::Name, SortOrder::Asc) => {
-            entries_with_meta.sort_by(|a, b| a.0.file_name().cmp(&b.0.file_name()));
-        }
-        (SortField::Name, SortOrder::Desc) => {
-            entries_with_meta.sort_by(|a, b| b.0.file_name().cmp(&a.0.file_name()));
-        }
-        (SortField::DateModified, SortOrder::Asc) => {
-            entries_with_meta.sort_by(|a, b| a.1.cmp(&b.1));
-        }
-        (SortField::DateModified, SortOrder::Desc) => {
-            entries_with_meta.sort_by(|a, b| b.1.cmp(&a.1));
-        }
-        (SortField::DateCreated, SortOrder::Asc) => {
-            entries_with_meta.sort_by(|a, b| a.2.cmp(&b.2));
-        }
-        (SortField::DateCreated, SortOrder::Desc) => {
-            entries_with_meta.sort_by(|a, b| b.2.cmp(&a.2));
-        }
-        // リコメンドソート: DBから埋め込みスコアを計算してソート
-        (SortField::Recommendation, _) => {
-            if let Some(db) = db {
-                // フォルダパスのリストを取得
-                let folder_paths: Vec<String> = entries_with_meta
-                    .iter()
-                    .map(|(e, _, _)| e.path().to_str().unwrap_or_default().to_string())
-                    .collect();
-
-                // スコアを計算
-                let scores = calculate_recommendation_scores(db, &folder_paths);
-
-                // スコアでソート（降順）
-                entries_with_meta.sort_by(|a, b| {
-                    let path_a = a.0.path().to_str().unwrap_or_default().to_string();
-                    let path_b = b.0.path().to_str().unwrap_or_default().to_string();
-                    let score_a = scores.get(&path_a).unwrap_or(&0.0);
-                    let score_b = scores.get(&path_b).unwrap_or(&0.0);
-                    score_b
-                        .partial_cmp(score_a)
-                        .unwrap_or(std::cmp::Ordering::Equal)
+        // 検索フィルタリング
+        if let Some(query) = search_query {
+            if !query.is_empty() {
+                let query_lower = query.to_lowercase();
+                entries.retain(|e| {
+                    e.file_name()
+                        .to_str()
+                        .map(|name| name.to_lowercase().contains(&query_lower))
+                        .unwrap_or(false)
                 });
-            } else {
-                // DBがない場合は更新日時降順でフォールバック
-                entries_with_meta.sort_by(|a, b| b.1.cmp(&a.1));
             }
         }
-    }
 
-    // 4. 総ページ数を計算
-    let total_count = entries_with_meta.len();
+        // メタデータ取得してソート
+        let mut entries_with_meta: Vec<_> = entries
+            .into_iter()
+            .map(|e| {
+                let metadata = e.metadata().ok();
+                let modified = metadata
+                    .as_ref()
+                    .and_then(|m| m.modified().ok())
+                    .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+                    .map(|d| d.as_secs());
+                let created = metadata
+                    .as_ref()
+                    .and_then(|m| m.created().ok())
+                    .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+                    .map(|d| d.as_secs());
+                (e, modified, created)
+            })
+            .collect();
+
+        // ソート実行
+        match (&sort.field, &sort.order) {
+            (SortField::Name, SortOrder::Asc) => {
+                entries_with_meta.sort_by(|a, b| a.0.file_name().cmp(&b.0.file_name()));
+            }
+            (SortField::Name, SortOrder::Desc) => {
+                entries_with_meta.sort_by(|a, b| b.0.file_name().cmp(&a.0.file_name()));
+            }
+            (SortField::DateModified, SortOrder::Asc) => {
+                entries_with_meta.sort_by(|a, b| a.1.cmp(&b.1));
+            }
+            (SortField::DateModified, SortOrder::Desc) => {
+                entries_with_meta.sort_by(|a, b| b.1.cmp(&a.1));
+            }
+            (SortField::DateCreated, SortOrder::Asc) => {
+                entries_with_meta.sort_by(|a, b| a.2.cmp(&b.2));
+            }
+            (SortField::DateCreated, SortOrder::Desc) => {
+                entries_with_meta.sort_by(|a, b| b.2.cmp(&a.2));
+            }
+            // リコメンドソート: DBから埋め込みスコアを計算してソート
+            (SortField::Recommendation, _) => {
+                if let Some(db) = db {
+                    let folder_paths: Vec<String> = entries_with_meta
+                        .iter()
+                        .map(|(e, _, _)| e.path().to_str().unwrap_or_default().to_string())
+                        .collect();
+                    let scores = calculate_recommendation_scores(db, &folder_paths);
+                    entries_with_meta.sort_by(|a, b| {
+                        let path_a = a.0.path().to_str().unwrap_or_default().to_string();
+                        let path_b = b.0.path().to_str().unwrap_or_default().to_string();
+                        let score_a = scores.get(&path_a).unwrap_or(&0.0);
+                        let score_b = scores.get(&path_b).unwrap_or(&0.0);
+                        score_b
+                            .partial_cmp(score_a)
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                    });
+                } else {
+                    entries_with_meta.sort_by(|a, b| b.1.cmp(&a.1));
+                }
+            }
+        }
+
+        // CachedDirEntry に変換してキャッシュへ保存
+        let new_entries: Vec<CachedDirEntry> = entries_with_meta
+            .into_iter()
+            .map(|(e, modified, created)| CachedDirEntry {
+                path: e.path().to_str().unwrap_or_default().to_string(),
+                filename: e.file_name().to_str().unwrap_or_default().to_string(),
+                modified_at: modified,
+                created_at: created,
+            })
+            .collect();
+
+        {
+            let mut w = dir_list_cache.write().await;
+            w.insert(cache_key, new_entries.clone());
+        }
+
+        new_entries
+    };
+
+    // 2. 総ページ数を計算
+    let total_count = all_entries.len();
     let total_pages = if total_count == 0 {
         1
     } else {
         total_count.div_ceil(CATALOG_PER_PAGE)
     };
 
-    // 5. ページネーション
+    // 3. ページネーション
     let start = (page.saturating_sub(1)) * CATALOG_PER_PAGE;
     let end = (start + CATALOG_PER_PAGE).min(total_count);
 
@@ -541,21 +575,20 @@ pub(crate) async fn explore_path_with_count(
         return Ok((vec![], total_pages));
     }
 
-    let page_entries = &entries_with_meta[start..end];
+    let page_entries = &all_entries[start..end];
 
-    // 6. サムネイル抽出 (並列処理)
+    // 4. サムネイル抽出 (並列処理)
     let tasks: Vec<_> = page_entries
         .iter()
-        .map(|(entry, modified, created)| {
-            let path = entry.path();
-            let filename = entry.file_name().to_str().unwrap_or_default().to_string();
+        .map(|entry| {
+            let path_str = entry.path.clone();
+            let filename = entry.filename.clone();
+            let path_buf = std::path::PathBuf::from(&entry.path);
             let cache = cache.clone();
-            let modified = *modified;
-            let created = *created;
+            let modified = entry.modified_at;
+            let created = entry.created_at;
 
             tokio::spawn(async move {
-                let path_str = path.to_str().unwrap_or_default().to_string();
-
                 // キャッシュチェック
                 {
                     let cache_read = cache.read().await;
@@ -571,9 +604,8 @@ pub(crate) async fn explore_path_with_count(
                 }
 
                 // キャッシュミス: ブロッキングI/Oで検索
-                let path_clone = path.clone();
                 let thumb =
-                    tokio::task::spawn_blocking(move || find_first_image_in_folder(&path_clone))
+                    tokio::task::spawn_blocking(move || find_first_image_in_folder(&path_buf))
                         .await
                         .unwrap_or_default();
 
@@ -630,4 +662,15 @@ pub(crate) async fn clear_thumbnail_cache_for_dir(
 ) {
     let mut cache_write = cache.write().await;
     cache_write.retain(|k, _| !k.starts_with(dir_path));
+}
+
+/// 指定されたディレクトリのディレクトリリストキャッシュをクリア
+/// dir_path で始まるキャッシュエントリを全て削除する
+pub(crate) async fn clear_dir_list_cache_for_dir(
+    dir_path: &str,
+    cache: Arc<RwLock<HashMap<String, Vec<CachedDirEntry>>>>,
+) {
+    let prefix = format!("{}|", dir_path);
+    let mut cache_write = cache.write().await;
+    cache_write.retain(|k, _| !k.starts_with(&prefix));
 }
